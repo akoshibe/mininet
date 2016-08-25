@@ -69,9 +69,9 @@ mn.1: $(MN)
 	PYTHONPATH=. help2man -N -n "create a Mininet network." \
 	--no-discard-stderr "$(PYMN)" -o $@
 
-mnexec.1: mnexec
+mnexec.1: $(MNEXEC)
 	help2man -N -n "execution utility for Mininet." \
-	-h "-h" -v "-v" --no-discard-stderr ./$< -o $@
+	-h "-h" -v "-v" --no-discard-stderr ./"$(MNEXEC)" -o $@
 
 .PHONY: doc
 

@@ -22,7 +22,6 @@ fi
 
 # Get directory containing mininet folder
 MININET_DIR=$( CDPATH= cd -- "$( dirname -- "$0" )/../.." && pwd -P )
-echo ***directory is: $MININET_DIR
 
 # install/do everything
 all () {
@@ -40,16 +39,23 @@ mn_deps () {
 	fi 
     fi
 
-    $install socat psmisc xterm openssh-portable iperf help2man bash\
+    $install python socat psmisc xterm openssh-portable iperf help2man bash\
         py27-setuptools py27-pyflakes pylint-py27 py27-pep8 py27-pexpect #\
         # gcc gmake
 
-    echo "Installing Mininet core"
+    printf '%s\n' "Installing Mininet core"
     cur=$(pwd -P) 
     cd ${MININET_DIR}/mininet
     ln -F mnexec-fbsd.c mnexec.c
     sudo make install
     cd ${cur} 
+}
+
+mn_undo () {
+    printf '%s\n' "Uninstalling Mininet core"
+    cd ${MININET_DIR}/mininet
+    sudo make uninstall
+    cd ${cur}
 }
 
 usage () {
@@ -60,7 +66,8 @@ usage () {
         "options:" \
         " -a: (default) install (A)ll packages" \
         " -h: print this (H)elp message" \
-        " -n: install Mini(N)et dependencies + core files"
+        " -n: install Mini(N)et dependencies + core files" \
+        " -u: (u)ninstall Mininet core files"
     exit 2
 }
 
@@ -72,6 +79,7 @@ else
             a)    all ;;
             h)    usage ;;
             n)    mn_deps ;;
+            u)    mn_undo ;;
             ?)    usage ;;
         esac
     done

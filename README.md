@@ -1,6 +1,10 @@
 Mininet: Rapid Prototyping for Software Defined Networks
 ========================================================
 
+**This is an experimental port of Mininet to FreeBSD. This is very
+much a work-in-progress and various things will likely be broken or
+unsupported!**
+
 *The best way to emulate almost any network on your laptop!*
 
 Mininet 2.3.0d1
