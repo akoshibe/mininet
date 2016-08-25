@@ -8,8 +8,9 @@ PYSRC = $(MININET) $(TEST) $(EXAMPLES) $(BIN)
 MNEXEC = mnexec
 MANPAGES = mn.1 mnexec.1
 P8IGN = E251,E201,E302,E202,E126,E127,E203,E226
-BINDIR = /usr/bin
-MANDIR = /usr/share/man/man1
+BINDIR = /usr/local/bin
+MANDIR = /usr/local/man/man1
+PKGDIR = /usr/local/lib/python2.7/site-packages
 DOCDIRS = doc/html doc/latex
 PDF = doc/latex/refman.pdf
 
@@ -19,6 +20,7 @@ all: codecheck test
 
 clean:
 	rm -rf build dist *.egg-info *.pyc $(MNEXEC) $(MANPAGES) $(DOCDIRS)
+	unlink mnexec.c
 
 codecheck: $(PYSRC)
 	-echo "Running code check"
@@ -50,6 +52,10 @@ install: $(MNEXEC) $(MANPAGES)
 	install $(MNEXEC) $(BINDIR)
 	install $(MANPAGES) $(MANDIR)
 	python setup.py install
+
+uninstall:
+	rm -rf $(BINDIR)/$(MNEXEC) $(BINDIR)/mn $(PKGDIR)/mininet-*.egg
+	printf $(MANDIR)'/%s\n' $(MANPAGES) | xargs rm
 
 develop: $(MNEXEC) $(MANPAGES)
 # 	Perhaps we should link these as well

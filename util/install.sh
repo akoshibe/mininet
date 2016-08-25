@@ -124,6 +124,8 @@ function kernel_clean {
 
 # Install Mininet deps
 function mn_deps {
+    local mandir='/usr/local/man/man1'
+
     echo "Installing Mininet dependencies"
     if [ "$DIST" = "Fedora" -o "$DIST" = "RedHatEnterpriseServer" ]; then
         $install gcc make socat psmisc xterm openssh-clients iperf \
@@ -137,6 +139,8 @@ function mn_deps {
 
     echo "Installing Mininet core"
     pushd $MININET_DIR/mininet
+    ln -F mnexec-linux.c mnexec.c
+    [ ! -d "$mandir" ] && sudo mkdir "$mandir"  
     sudo make install
     popd
 }
