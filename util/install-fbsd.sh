@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Mininet install script with just the bits that are currently supported.
-# It follows the logic/contents of `install.sh`. 
+# It follows the logic/contents of `install.sh`.
 
 dist=$(uname -s)
 ver=$(uname -K)
@@ -18,7 +18,7 @@ else
     printf '%s\n' "This script is for FreeBSD, but you are using ${dist}" \
                   "Try install.sh instead"
     exit 1
-fi 
+fi
 
 # Get directory containing mininet folder
 MININET_DIR=$( CDPATH= cd -- "$( dirname -- "$0" )/../.." && pwd -P )
@@ -28,7 +28,7 @@ all () {
     mn_deps
 }
 
-# base (non-OpenFlow) bits - Mininet Python bits, dependencies 
+# base (non-OpenFlow) bits - Mininet Python bits, dependencies
 mn_deps () {
     # check for VIMAGE support - how correlated is uname -K to -r?
     if [ ${ver} -lt 1100000 ]; then
@@ -36,7 +36,7 @@ mn_deps () {
             printf '%s\n' "VIMAGE and DUMMYNET are required but seem missing" \
                           "Retry after rebuilding your kernel with these options"
             exit 1
-	fi 
+	fi
     fi
 
     $install python socat psmisc xterm openssh-portable iperf help2man bash\
@@ -44,11 +44,11 @@ mn_deps () {
         # gcc gmake
 
     printf '%s\n' "Installing Mininet core"
-    cur=$(pwd -P) 
+    cur=$(pwd -P)
     cd ${MININET_DIR}/mininet
     ln -F mnexec-fbsd.c mnexec.c
     sudo make install
-    cd ${cur} 
+    cd ${cur}
 }
 
 mn_undo () {
@@ -74,7 +74,7 @@ usage () {
 if [ $# -eq 0 ]; then
     all
 else
-    while getopts 'ahn' OPTION; do
+    while getopts 'ahnu' OPTION; do
         case $OPTION in
             a)    all ;;
             h)    usage ;;
