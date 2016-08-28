@@ -314,7 +314,7 @@ class Mininet( object ):
             natIP = nat.params[ 'ip' ].split('/')[ 0 ]
             for host in self.hosts:
                 if host.inNamespace:
-                    host.setDefaultRoute( 'via %s' % natIP )
+                    host.setDefaultRoute( natIP )
         return nat
 
     # BL: We now have four ways to look up nodes

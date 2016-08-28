@@ -15,8 +15,10 @@ if [ "${dist}" = "FreeBSD" ]; then
     #remove='sudo pkg -o ASSUME_ALWAYS_YES=true remove'
     #pkginst='sudo pkg -o ASSUME_ALWAYS_YES=true add'
 else
-    printf '%s\n' "This script is for FreeBSD, but you are using ${dist}" \
-                  "Try install.sh instead"
+    printf '%s\n' "This version of Mininet and script is for FreeBSD," \
+                  "but you are using ${dist}" \
+                  "" \
+                  "Try classic Mininet with install.sh instead"
     exit 1
 fi
 

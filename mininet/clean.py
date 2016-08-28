@@ -87,19 +87,19 @@ class Cleanup( object ):
             sh( 'ovs-vsctl del-br ' + dp )
 
         info( "*** Removing all links of the pattern foo-ethX\n" )
-        links = sh( "ip link show | "
+        links = sh( "ifconfig -l | "
                     "egrep -o '([-_.[:alnum:]]+-eth[[:digit:]]+)'"
                     ).splitlines()
         # Delete blocks of links
         n = 1000  # chunk size
         for i in range( 0, len( links ), n ):
-            cmd = ';'.join( 'ip link del %s' % link
+            cmd = ';'.join( 'ifconfig %s destroy' % link
                              for link in links[ i : i + n ] )
             sh( '( %s ) 2> /dev/null' % cmd )
 
-        if 'tap9' in sh( 'ip link show' ):
+        if 'tap9' in sh( 'ifconfig -l' ):
             info( "*** Removing tap9 - assuming it's from cluster edition\n" )
-            sh( 'ip link del tap9' )
+            sh( 'ifconfig tap9 destroy' )
 
         info( "*** Killing stale mininet node processes\n" )
         killprocs( 'mininet:' )

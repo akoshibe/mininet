@@ -104,7 +104,7 @@ class Node( object ):
 
         # Start command interpreter shell
         self.startShell()
-        self.mountPrivateDirs()
+        # self.mountPrivateDirs()
 
     # File descriptor to node mapping support
     # Class variables and methods
@@ -126,15 +126,30 @@ class Node( object ):
         if self.shell:
             error( "%s: shell is already running\n" % self.name )
             return
-        # mnexec: (c)lose descriptors, (d)etach from tty,
-        # (p)rint pid, and run in (n)amespace
+        # assume we're not (resource) virtualized - use mnexec
+        # mnexec: (c)lose descriptors, (d)etach from tty
+        execcmd = 'mnexec'
         opts = '-cd' if mnopts is None else mnopts
+
+        # if true, shell is in a namespace, or in our case, a jail
+        # -ci : create, then output just the JID; vnet : with virtual network
+        # stack; allow.raw_sockets : enable raw socket creation;
+        # stop.timeout=0 : don't wait for a process to exit in a jail
         if self.inNamespace:
-            opts += 'n'
+            cmd = [ 'jail', '-ci', 'vnet', 'allow.raw_sockets', 'persist',
+                    'stop.timeout=0', 'name=' + self.name, 'path=/' ]
+            ret = int( self._popen( jcmd, stdout=PIPE ).communicate()[ 0 ][ :-1 ]
+            try:
+                execcmd = 'jexec'
+                opts = self.jid = int( ret )
+            except ValueError as e:
+                error( "%s: could not create a jail\n" % self.name )
+                return
+
         # bash -i: force interactive
-        # -s: pass $* to shell, and make process easy to find in ps
-        # prompt is set to sentinel chr( 127 )
-        cmd = [ 'mnexec', opts, 'env', 'PS1=' + chr( 127 ),
+        # -s: pass $* to shell, and make process easy to find in ps outside of
+        # a jail. prompt is set to sentinel chr( 127 )
+        cmd = [ execcmd, opts, 'env', 'PS1=' + chr( 127 ),
                 'bash', '--norc', '-is', 'mininet:' + self.name ]
         # Spawn a shell subprocess in a pseudo-tty, to disable buffering
         # in the subprocess and insulate it from signals (e.g. SIGINT)
@@ -245,7 +260,11 @@ class Node( object ):
     def terminate( self ):
         "Send kill signal to Node and clean up after it."
         self.unmountPrivateDirs()
-        if self.shell:
+        if self.jid:
+            # bring back if stop.timeout=0 doesn't work
+            # quietRun( 'jexec ' + self.jid + ' pkill -9 bash' )
+            quietRun( 'jail -r ' + self.jid )
+        elif self.shell:
             if self.shell.poll() is None:
                 os.killpg( self.shell.pid, signal.SIGHUP )
         self.cleanup()
@@ -366,9 +385,10 @@ class Node( object ):
         """Return a Popen() object in our namespace
            args: Popen() args, single list, or string
            kwargs: Popen() keyword args"""
-        defaults = { 'stdout': PIPE, 'stderr': PIPE,
-                     'mncmd':
-                     [ 'mnexec', '-da', str( self.pid ) ] }
+        defaults = {
+            'stdout': PIPE, 'stderr': PIPE,
+            'mncmd':
+            [ 'jexec', self.name ] if self.jid else [ 'mnexec', '-d' ] }
         defaults.update( kwargs )
         if len( args ) == 1:
             if isinstance( args[ 0 ], list ):
@@ -382,7 +402,7 @@ class Node( object ):
         elif len( args ) > 0:
             # popen( cmd, arg1, arg2... )
             cmd = list( args )
-        # Attach to our namespace  using mnexec -a
+        # Execute command with jexec if in jail, otherwise mnexec
         cmd = defaults.pop( 'mncmd' ) + cmd
         # Shell requires a string, not a list!
         if defaults.get( 'shell', False ):
@@ -506,18 +526,19 @@ class Node( object ):
         """Add route to host.
            ip: IP address as dotted decimal
            intf: string, interface name"""
-        return self.cmd( 'route add -host', ip, 'dev', intf )
+        # add stronger checks for interface lookup
+        return self.cmd( 'route add -host', ip, self.intf( intf ).IP() )
 
-    def setDefaultRoute( self, intf=None ):
+    def setDefaultRoute( self, intf=None,  ):
         """Set the default route to go through intf.
-           intf: Intf or {dev <intfname> via <gw-ip> ...}"""
+           intf: Intf or gw-ip"""
         # Note setParam won't call us if intf is none
-        if isinstance( intf, basestring ) and ' ' in intf:
+        if isinstance( intf, basestring ):
             params = intf
         else:
-            params = 'dev %s' % intf
+            params = intf.IP()
         # Do this in one line in case we're messing with the root namespace
-        self.cmd( 'ip route del default; ip route add default', params )
+        self.cmd( 'route del default; route add default', params )
 
     # Convenience and configuration methods
 
@@ -590,7 +611,7 @@ class Node( object ):
         self.setParam( r, 'setIP', ip=ip )
         self.setParam( r, 'setDefaultRoute', defaultRoute=defaultRoute )
         # This should be examined
-        self.cmd( 'ifconfig lo ' + lo )
+        self.cmd( 'ifconfig lo0 ' + lo )
         return r
 
     def configDefault( self, **moreParams ):
@@ -873,7 +894,7 @@ class Switch( Node ):
         self.opts = opts
         self.listenPort = listenPort
         if not self.inNamespace:
-            self.controlIntf = Intf( 'lo', self, port=0 )
+            self.controlIntf = Intf( 'lo0', self, port=0 )
 
     def defaultDpid( self, dpid=None ):
         "Return correctly formatted dpid from dpid or switch name (s1 -> 1)"
@@ -1239,7 +1260,7 @@ class OVSSwitch( Switch ):
            deleteIntfs: delete interfaces? (True)"""
         self.cmd( 'ovs-vsctl del-br', self )
         if self.datapath == 'user':
-            self.cmd( 'ip link del', self )
+            self.cmd( 'ifconfig', self, 'destroy' )
         super( OVSSwitch, self ).stop( deleteIntfs )
 
     @classmethod

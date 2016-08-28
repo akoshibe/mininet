@@ -5,18 +5,18 @@ from mininet.log import info, error, debug
 from os import environ
 
 def lsmod():
-    "Return output of lsmod."
-    return quietRun( 'lsmod' )
+    """Return list of currently loaded kernel modules."""
+    return quietRun( 'kldstat' )
 
 def rmmod( mod ):
-    """Return output of lsmod.
+    """Attempt to unload a specified module.
        mod: module string"""
-    return quietRun( [ 'rmmod', mod ] )
+    return quietRun( [ 'kldunload', mod ] )
 
 def modprobe( mod ):
-    """Return output of modprobe
+    """Attempt to load a specified module.
        mod: module string"""
-    return quietRun( [ 'modprobe', mod ] )
+    return quietRun( [ 'kldload', mod ] )
 
 OF_KMOD = 'ofdatapath'
 OVS_KMOD = 'openvswitch_mod'  # Renamed 'openvswitch' in OVS 1.7+/Linux 3.5+
