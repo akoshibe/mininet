@@ -534,6 +534,10 @@ class Node( object ):
            intf: Intf or gw-ip"""
         # Note setParam won't call us if intf is none
         if isinstance( intf, basestring ):
+            if ' ' in intf:
+                warn( '%s: setDefaultRoute takes a port name but we got: %s\n' %
+                      ( self.name, intf ) )
+                return
             params = intf
         else:
             params = intf.IP()

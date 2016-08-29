@@ -47,7 +47,7 @@ class Intf( object ):
 
         # if interface is lo, we know the ip is 127.0.0.1.
         # This saves an ifconfig command per node
-        if self.name == 'lo':
+        if self.name == 'lo0':
             self.ip = '127.0.0.1'
             self.prefixLen = 8
         # Add to node (and move ourselves if necessary )
@@ -87,8 +87,7 @@ class Intf( object ):
            macstr: MAC address as string"""
         self.mac = macstr
         return ( self.ifconfig( 'down' ) +
-                 self.ifconfig( 'hw', 'ether', macstr ) +
-                 self.ifconfig( 'up' ) )
+                 self.ifconfig( 'ether', macstr, 'up' ) )
 
     _ipMatchRegex = re.compile( r'\d+\.\d+\.\d+\.\d+' )
     _macMatchRegex = re.compile( r'..:..:..:..:..:..' )
@@ -147,7 +146,7 @@ class Intf( object ):
     def rename( self, newname ):
         "Rename interface"
         self.ifconfig( 'down' )
-        result = self.cmd( 'ip link set', self.name, 'name', newname )
+        result = self.ifconfig( 'name', newname )
         self.name = newname
         self.ifconfig( 'up' )
         return result
@@ -197,17 +196,18 @@ class Intf( object ):
 
     def delete( self ):
         "Delete interface"
-        self.cmd( 'ip link del ' + self.name )
         # We used to do this, but it slows us down:
         # if self.node.inNamespace:
         # Link may have been dumped into root NS
-        # quietRun( 'ip link del ' + self.name )
+        # quietRun( 'ip link del' + self.name )
+        jopt = '-vnet ' + self.node.jid if self.node.jid else ''
+        self.ifconfig( jopt, 'destroy' )
         self.node.delIntf( self )
         self.link = None
 
     def status( self ):
         "Return intf status as a string"
-        links, _err, _result = self.node.pexec( 'ip link show' )
+        links, _err, _result = self.node.pexec( 'ifconfig -l' )
         if self.name in links:
             return "OK"
         else:

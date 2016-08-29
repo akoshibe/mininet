@@ -55,6 +55,7 @@ mn_deps () {
 
 mn_undo () {
     printf '%s\n' "Uninstalling Mininet core"
+    cur=$(pwd -P)
     cd ${MININET_DIR}/mininet
     sudo make uninstall
     cd ${cur}
