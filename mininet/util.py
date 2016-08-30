@@ -171,28 +171,41 @@ def makeIntfPair( intf1, intf2, addr1=None, addr2=None, node1=None, node2=None,
        runCmd: function to run shell commands (quietRun)
        raises Exception on failure"""
     if not runCmd:
-        runCmd = quietRun if not node1 else node1.cmd
-        runCmd2 = quietRun if not node2 else node2.cmd
+        runCmd = quietRun
     if deleteIntfs:
-        # Delete any old interfaces with the same names
-        runCmd( 'ip link del ' + intf1 )
-        runCmd2( 'ip link del ' + intf2 )
+        # Delete any old interfaces with the same names - want intf-node map?
+        deleteIntf( intf1, node1 )
+        deleteIntf( intf2, node2 )
     # Create new pair
-    netns = 1 if not node2 else node2.pid
+    out = quietRun( 'ifconfig epair create' )
+    if 'epair' not in out:
+        raise Exception( 'Encountered error while creating link: %s' % out )
+    # Reconstruct the endpoint names: epair[n]{a,b}
+    end1, end2 = out[ :-1 ], out[ :-2 ] + 'b'
+
+    # If MAC address(es) aren't specified, and endpoints are jailed, generate
+    # MAC addresses to prevent if_index aliasing, pretty ugly for now
     if addr1 is None and addr2 is None:
-        cmdOutput = runCmd( 'ip link add name %s '
-                            'type veth peer name %s '
-                            'netns %s' % ( intf1, intf2, netns ) )
-    else:
-        cmdOutput = runCmd( 'ip link add name %s '
-                            'address %s '
-                            'type veth peer name %s '
-                            'address %s '
-                            'netns %s' %
-                            (  intf1, addr1, intf2, addr2, netns ) )
-    if cmdOutput:
-        raise Exception( "Error creating interface pair (%s,%s): %s " %
-                         ( intf1, intf2, cmdOutput ) )
+        base = _colonHex( int( end1[ 5:-1 ] ), 3 )
+        addr1 = '02:ff:' + base + ':0a'
+        addr2 = '02:ff:' + base + ':0b'
+    quietRun( 'ifconfig %s link %s name %s' % ( end1, addr1, intf1 ) )
+    quietRun( 'ifconfig %s link %s name %s' % ( end2, addr2, intf2 ) )
+
+    # Move interfaces if necessary i.e. ends are specified
+    if node1 and node1.jid:
+        out1 = moveIntfNoRetry( intf1, node1 )
+    if node2 and node2.jid:
+        out2 = moveIntfNoRetry( intf2, node2 )
+    if not ( out1 and out2 ):
+        raise Exception( 'Failed to create new Link (%s-%s)', node1, node2 )
+
+def deleteIntf( intf, node=None ):
+    """Destroy an interface. If only intf1 is specified, assume that it's
+       in the host."""
+    if node1 and node1.jid is not None:
+        opts = '-vnet %s' % node.jid
+    quietRun( 'ifconfig %s %s destroy' % ( intf, opts if opts else '' ) )
 
 def retry( retries, delaySecs, fn, *args, **keywords ):
     """Try something several times before giving up.
@@ -209,15 +222,15 @@ def retry( retries, delaySecs, fn, *args, **keywords ):
         exit( 1 )
 
 def moveIntfNoRetry( intf, dstNode, printError=False ):
-    """Move interface to node, without retrying.
+    """Move interface to node from host/root space, without retrying.
        intf: string, interface
         dstNode: destination Node
         printError: if true, print error"""
     intf = str( intf )
-    cmd = 'ip link set %s netns %s' % ( intf, dstNode.pid )
+    cmd = 'ifconfig %s vnet %s' % ( intf, dstNode.jid )
     cmdOutput = quietRun( cmd )
-    # If ip link set does not produce any output, then we can assume
-    # that the link has been moved successfully.
+    # If command does not produce any output, then we can assume
+    # that the interface has been moved successfully.
     if cmdOutput:
         if printError:
             error( '*** Error: moveIntf: ' + intf +
@@ -406,21 +419,17 @@ def pmonitor(popens, timeoutms=500, readline=True,
 # Other stuff we use
 def sysctlTestAndSet( name, limit ):
     "Helper function to set sysctl limits"
-    #convert non-directory names into directory names
-    if '/' not in name:
-        name = '/proc/sys/' + name.replace( '.', '/' )
-    #read limit
-    with open( name, 'r' ) as readFile:
-        oldLimit = readFile.readline()
-        if isinstance( limit, int ):
-            #compare integer limits before overriding
-            if int( oldLimit ) < limit:
-                with open( name, 'w' ) as writeFile:
-                    writeFile.write( "%d" % limit )
-        else:
-            #overwrite non-integer limits
-            with open( name, 'w' ) as writeFile:
-                writeFile.write( limit )
+    oldLimit = quietRun( 'sysctl -n ' + name )
+    if 'sysctl' in oldLimit:
+        error( 'Could not set value: %s' % out )
+        return
+    if isinstance( limit, int ):
+        #compare integer limits before overriding
+        if int( oldLimit ) < limit:
+            quietRun( 'sysctl %s=%s' % name, limit )
+    else:
+        #overwrite non-integer limits
+        quietRun( 'sysctl %s=%s' % name, limit )
 
 def rlimitTestAndSet( name, limit ):
     "Helper function to set rlimits"
@@ -431,30 +440,32 @@ def rlimitTestAndSet( name, limit ):
 
 def fixLimits():
     "Fix ridiculously small resource limits."
-    debug( "*** Setting resource limits\n" )
-    try:
-        rlimitTestAndSet( RLIMIT_NPROC, 8192 )
-        rlimitTestAndSet( RLIMIT_NOFILE, 16384 )
+    # see what needs to be/should be tuned here
+    pass
+    #debug( "*** Setting resource limits\n" )
+    #try:
+        #rlimitTestAndSet( RLIMIT_NPROC, 8192 )
+        #rlimitTestAndSet( RLIMIT_NOFILE, 16384 )
         #Increase open file limit
-        sysctlTestAndSet( 'fs.file-max', 10000 )
+        #sysctlTestAndSet( 'kern.maxfiles', 10000 )
         #Increase network buffer space
-        sysctlTestAndSet( 'net.core.wmem_max', 16777216 )
-        sysctlTestAndSet( 'net.core.rmem_max', 16777216 )
-        sysctlTestAndSet( 'net.ipv4.tcp_rmem', '10240 87380 16777216' )
-        sysctlTestAndSet( 'net.ipv4.tcp_wmem', '10240 87380 16777216' )
-        sysctlTestAndSet( 'net.core.netdev_max_backlog', 5000 )
+        #sysctlTestAndSet( 'net.core.wmem_max', 16777216 )
+        #sysctlTestAndSet( 'net.core.rmem_max', 16777216 )
+        #sysctlTestAndSet( 'net.ipv4.tcp_rmem', '10240 87380 16777216' )
+        #sysctlTestAndSet( 'net.ipv4.tcp_wmem', '10240 87380 16777216' )
+        #sysctlTestAndSet( 'net.core.netdev_max_backlog', 5000 )
         #Increase arp cache size
-        sysctlTestAndSet( 'net.ipv4.neigh.default.gc_thresh1', 4096 )
-        sysctlTestAndSet( 'net.ipv4.neigh.default.gc_thresh2', 8192 )
-        sysctlTestAndSet( 'net.ipv4.neigh.default.gc_thresh3', 16384 )
+        #sysctlTestAndSet( 'net.ipv4.neigh.default.gc_thresh1', 4096 )
+        #sysctlTestAndSet( 'net.ipv4.neigh.default.gc_thresh2', 8192 )
+        #sysctlTestAndSet( 'net.ipv4.neigh.default.gc_thresh3', 16384 )
         #Increase routing table size
-        sysctlTestAndSet( 'net.ipv4.route.max_size', 32768 )
+        #sysctlTestAndSet( 'net.ipv4.route.max_size', 32768 )
         #Increase number of PTYs for nodes
-        sysctlTestAndSet( 'kernel.pty.max', 20000 )
+        #sysctlTestAndSet( 'kernel.pty.max', 20000 )
     # pylint: disable=broad-except
-    except Exception:
-        warn( "*** Error setting resource limits. "
-              "Mininet's performance may be affected.\n" )
+    #except Exception:
+        #warn( "*** Error setting resource limits. "
+        #      "Mininet's performance may be affected.\n" )
     # pylint: enable=broad-except
 
 
@@ -486,7 +497,7 @@ def numCores():
     if hasattr( numCores, 'ncores' ):
         return numCores.ncores
     try:
-        numCores.ncores = int( quietRun('grep -c processor /proc/cpuinfo') )
+        numCores.ncores = int( quietRun('sysctl -n hw.ncpu') )
     except ValueError:
         return 0
     return numCores.ncores
