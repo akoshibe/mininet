@@ -138,11 +138,12 @@ class Node( object ):
         if self.inNamespace:
             cmd = [ 'jail', '-ci', 'vnet', 'allow.raw_sockets', 'persist',
                     'stop.timeout=0', 'name=' + self.name, 'path=/' ]
-            ret = int( self._popen( jcmd, stdout=PIPE ).communicate()[ 0 ][ :-1 ]
+            ret = int( self._popen(
+                       cmd, stdout=PIPE ).communicate()[ 0 ][ :-1 ] )
             try:
                 execcmd = 'jexec'
-                opts = self.jid = int( ret )
-            except ValueError as e:
+                opts = self.jid = str( ret )
+            except ValueError:
                 error( "%s: could not create a jail\n" % self.name )
                 return
 
@@ -261,8 +262,8 @@ class Node( object ):
         "Send kill signal to Node and clean up after it."
         self.unmountPrivateDirs()
         if self.jid:
-            # bring back if stop.timeout=0 doesn't work
-            # quietRun( 'jexec ' + self.jid + ' pkill -9 bash' )
+            # for when stop.timeout=0 doesn't work
+            quietRun( 'jexec ' + self.jid + ' pkill -9 bash' )
             quietRun( 'jail -r ' + self.jid )
         elif self.shell:
             if self.shell.poll() is None:
