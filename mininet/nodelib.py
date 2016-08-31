@@ -6,8 +6,68 @@ This contains additional Node types which you may find to be useful.
 
 from mininet.node import Node, Switch
 from mininet.log import info, warn
-from mininet.moduledeps import pathCheck
+from mininet.moduledeps import pathCheck, lsmod, modprobe
 from mininet.util import quietRun
+
+class IfBridge( Switch ):
+    "FreeBSD if_bridge device Node (with optional spanning tree)."
+
+    nextPrio = 100  # next bridge priority for spanning tree
+
+    def __init__( self, name, stp=False, prio=None, **kwargs ):
+        """stp: use spanning tree protocol? (default False)
+           prio: optional explicit bridge priority for STP"""
+        self.stp = stp
+        if prio:
+            self.prio = prio
+        else:
+            self.prio = IfBridge.nextPrio
+            IfBridge.nextPrio += 1
+        Switch.__init__( self, name, **kwargs )
+
+    def connected( self ):
+        "Are we forwarding yet?"
+        if self.stp:
+            return 'UP' in self.cmd( 'ifconfig', self.bname )
+        else:
+            return True
+
+    def start( self, _controllers ):
+        "Start bridge. Retain the bridge's name to save on ifconfig calls"
+        res = quietRun( 'ifconfig bridge create' )[:-1]
+        self.bname = res
+        quietRun( 'ifconfig %s vnet %s' % ( res, self ) )
+        addcmd, stpcmd = '', ''
+        for i in self.intfList():
+            if self.name in i.name or 'epair' in i.name:
+                addcmd += ' addm ' + i.name
+                if self.stp:
+                    # STP settings are per-port. perhaps enable that as an option.
+                    stpcmd += ' stp ' + i.name
+                self.cmd( 'ifconfig', i.name, 'up' )
+        self.cmd( 'ifconfig', res, addcmd )
+        if self.stp:
+            # ifconfig 'stp' and 'priority' latter default 32768
+            self.cmd( 'ifconfig', res, 'priority', self.prio )
+            self.cmd( 'ifconfig', res, stpcmd )
+        self.cmd( 'ifconfig', res, 'up' )
+
+    def stop( self, deleteIntfs=True ):
+        """Stop bridge
+           deleteIntfs: delete interfaces? (True)"""
+        self.cmd( 'ifconfig %s destroy' % self.bname )
+        super( IfBridge, self ).stop( deleteIntfs )
+
+    def dpctl( self, *args ):
+        "Run brctl command"
+        # actually ifconfig
+        return self.cmd( 'ifconfig', self.bname, *args )
+
+    @classmethod
+    def setup( cls ):
+        "Check dependencies"
+        if 'if_bridge' not in lsmod():
+            modprobe( 'if_bridge' )
 
 
 class LinuxBridge( Switch ):
