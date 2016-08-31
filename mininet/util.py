@@ -195,10 +195,12 @@ def makeIntfPair( intf1, intf2, addr1=None, addr2=None, node1=None, node2=None,
     # Move interfaces if necessary i.e. ends are specified
     if node1 and node1.jid:
         out1 = moveIntfNoRetry( intf1, node1 )
+        if not ( out1 ):
+            raise Exception( 'Failed to move %s to %s', intf1, node1 )
     if node2 and node2.jid:
         out2 = moveIntfNoRetry( intf2, node2 )
-    if not ( out1 and out2 ):
-        raise Exception( 'Failed to create new Link (%s-%s)', node1, node2 )
+        if not ( out2 ):
+            raise Exception( 'Failed to move %s to %s', intf2, node2 )
 
 def deleteIntf( intf, node=None ):
     """Destroy an interface. If only intf1 is specified, assume that it's

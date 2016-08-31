@@ -95,6 +95,8 @@ class Node( object ):
                          # replace with Port objects, eventually ?
         self.nameToIntf = {}  # dict of interface names to Intfs
 
+        self.jid = None  # host-unique identifier when inNamespace=True
+
         # Make pylint happy
         ( self.shell, self.execed, self.pid, self.stdin, self.stdout,
             self.lastPid, self.lastCmd, self.pollOut ) = (
