@@ -145,10 +145,8 @@ class Intf( object ):
 
     def rename( self, newname ):
         "Rename interface"
-        self.ifconfig( 'down' )
         result = self.ifconfig( 'name', newname )
         self.name = newname
-        self.ifconfig( 'up' )
         return result
 
     # The reason why we configure things in this way is so
