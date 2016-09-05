@@ -532,7 +532,7 @@ class Node( object ):
         # add stronger checks for interface lookup
         return self.cmd( 'route add -host', ip, self.intf( intf ).IP() )
 
-    def setDefaultRoute( self, intf=None,  ):
+    def setDefaultRoute( self, intf=None ):
         """Set the default route to go through intf.
            intf: Intf or gw-ip"""
         # Note setParam won't call us if intf is none

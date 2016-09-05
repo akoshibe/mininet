@@ -1,8 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """
-natnet.py: Example network with NATs
+natnet.py: Example network with NATs.
 
+All hosts are in their own subnet, but h1 and h2's traffic should be able to
+reach h0. Note that h0 has no routes to h1 or h2, so it won't be able to reach
+the former e.g. respond to echo requests. 
 
            h0
            |
@@ -20,7 +23,8 @@ natnet.py: Example network with NATs
 
 from mininet.topo import Topo
 from mininet.net import Mininet
-from mininet.nodelib import NAT
+from mininet.nodelib import NAT, IfBridge
+from mininet.node import NullController
 from mininet.log import setLogLevel
 from mininet.cli import CLI
 from mininet.util import irange
@@ -31,7 +35,7 @@ class InternetTopo(Topo):
         Topo.__init__(self, **opts)
 
         # set up inet switch
-        inetSwitch = self.addSwitch('s0')
+        inetSwitch = self.addSwitch('s0', cls=IfBridge)
         # add inet host
         inetHost = self.addHost('h0')
         self.addLink(inetSwitch, inetHost)
@@ -46,20 +50,20 @@ class InternetTopo(Topo):
             # add NAT to topology
             nat = self.addNode('nat%d' % i, cls=NAT, subnet=localSubnet,
                                inetIntf=inetIntf, localIntf=localIntf)
-            switch = self.addSwitch('s%d' % i)
+            switch = self.addSwitch('s%d' % i, cls=IfBridge)
             # connect NAT to inet and local switches
             self.addLink(nat, inetSwitch, intfName1=inetIntf)
             self.addLink(nat, switch, intfName1=localIntf, params1=natParams)
             # add host and connect to local switch
             host = self.addHost('h%d' % i,
                                 ip='192.168.%d.100/24' % i,
-                                defaultRoute='via %s' % localIP)
+                                defaultRoute=localIP)
             self.addLink(host, switch)
 
 def run():
     "Create network and run the CLI"
     topo = InternetTopo()
-    net = Mininet(topo=topo)
+    net = Mininet(topo=topo, controller=NullController)
     net.start()
     CLI(net)
     net.stop()

@@ -130,19 +130,38 @@ class LinuxBridge( Switch ):
 
 
 class NAT( Node ):
-    "NAT: Provides connectivity to external network"
+    """NAT: Provides connectivity to external network using ipfw. NOTE: This
+       *will* mangle IPFW rules that are already present on the host!"""
+
+    nextId = 100 # unique NAT instance number
+    ruleBase = 10 # rule number to start from
 
     def __init__( self, name, subnet='10.0/8',
-                  localIntf=None, flush=False, **params):
+                  localIntf=None, flush=False,
+                  natid=None, rulenr=None, **params):
         """Start NAT/forwarding between Mininet and external network
            subnet: Mininet subnet (default 10.0/8)
-           flush: flush iptables before installing NAT rules"""
+           flush: flush existing rules before installing NAT rules"""
         super( NAT, self ).__init__( name, **params )
 
         self.subnet = subnet
         self.localIntf = localIntf
         self.flush = flush
-        self.forwardState = self.cmd( 'sysctl -n net.ipv4.ip_forward' ).strip()
+        if natid:
+            self.natId = str( natid )
+        else:
+            self.natId = str( NAT.nextId )
+            NAT.nextId += 1
+        if rulenr:
+            self.ruleNr = str( rulenr )
+        else:
+            self.ruleNr = str( NAT.ruleBase )
+            NAT.ruleBase += 10 # rule numbers 10 apart for each for readability
+        self.forwardState = self.cmd( 'sysctl -n net.inet.ip.forwarding' ).strip()
+
+    def ipfw( self, *args ):
+        """ invoke ipfw, -q for quiet """
+        return self.cmd( 'ipfw -q', *args )
 
     def config( self, **params ):
         """Configure the NAT and iptables"""
@@ -152,53 +171,41 @@ class NAT( Node ):
             self.localIntf = self.defaultIntf()
 
         if self.flush:
-            self.cmd( 'sysctl net.ipv4.ip_forward=0' )
-            self.cmd( 'iptables -F' )
-            self.cmd( 'iptables -t nat -F' )
-            # Create default entries for unmatched traffic
-            self.cmd( 'iptables -P INPUT ACCEPT' )
-            self.cmd( 'iptables -P OUTPUT ACCEPT' )
-            self.cmd( 'iptables -P FORWARD DROP' )
+            self.cmd( 'sysctl net.inet.ip.forwarding=0' )
+            self.ipfw( 'flush' )
 
         # Install NAT rules
-        self.cmd( 'iptables -I FORWARD',
-                  '-i', self.localIntf, '-d', self.subnet, '-j DROP' )
-        self.cmd( 'iptables -A FORWARD',
-                  '-i', self.localIntf, '-s', self.subnet, '-j ACCEPT' )
-        self.cmd( 'iptables -A FORWARD',
-                  '-o', self.localIntf, '-d', self.subnet,'-j ACCEPT' )
-        self.cmd( 'iptables -t nat -A POSTROUTING',
-                  '-s', self.subnet, "'!'", '-d', self.subnet, '-j MASQUERADE' )
+        self.ipfw( 'nat', self.natId, 'config if', self.localIntf, 'reset' )
+        self.ipfw( 'add', self.ruleNr, 'nat', self.natId,
+                   'all from', self.subnet, 'to any out' )
+        self.ipfw( 'add', self.ruleNr, 'nat', self.natId,
+                   'all from any to any in' )
 
         # Instruct the kernel to perform forwarding
-        self.cmd( 'sysctl net.ipv4.ip_forward=1' )
-
-        # Prevent network-manager from messing with our interface
-        # by specifying manual configuration in /etc/network/interfaces
-        intf = self.localIntf
-        cfile = '/etc/network/interfaces'
-        line = '\niface %s inet manual\n' % intf
-        config = open( cfile ).read()
-        if ( line ) not in config:
-            info( '*** Adding "' + line.strip() + '" to ' + cfile + '\n' )
-            with open( cfile, 'a' ) as f:
-                f.write( line )
-        # Probably need to restart network-manager to be safe -
-        # hopefully this won't disconnect you
-        self.cmd( 'service network-manager restart' )
+        self.cmd( 'sysctl net.inet.ip.forwarding=1' )
 
     def terminate( self ):
         "Stop NAT/forwarding between Mininet and external network"
-        # Remote NAT rules
-        self.cmd( 'iptables -D FORWARD',
-                   '-i', self.localIntf, '-d', self.subnet, '-j DROP' )
-        self.cmd( 'iptables -D FORWARD',
-                  '-i', self.localIntf, '-s', self.subnet, '-j ACCEPT' )
-        self.cmd( 'iptables -D FORWARD',
-                  '-o', self.localIntf, '-d', self.subnet,'-j ACCEPT' )
-        self.cmd( 'iptables -t nat -D POSTROUTING',
-                  '-s', self.subnet, '\'!\'', '-d', self.subnet,
-                  '-j MASQUERADE' )
+        # Remove NAT rules
+        self.ipfw( 'delete', self.ruleNr )
+        self.ipfw( 'delete 32000' )
+
         # Put the forwarding state back to what it was
-        self.cmd( 'sysctl net.ipv4.ip_forward=%s' % self.forwardState )
+        self.cmd( 'sysctl net.inet.ip.forwarding=%s' % self.forwardState )
         super( NAT, self ).terminate()
+
+    @classmethod
+    def setup( cls ):
+        """ check for dependencies, then configure and load them """
+        klds = lsmod()
+        kenv = quietRun( 'kenv net.inet.ip.fw.default_to_accept' ).strip()
+        deny = True if kenv == '0' else False
+        # if the default rule is deny all, change to allow all so hosts can
+        # still pass traffic. Also reload ipfw so that it is reconfigured
+        if deny:
+            quietRun( 'kenv net.inet.ip.fw.default_to_accept=1' )
+        if deny and 'ipfw.ko' in klds:
+            rmmod( 'ipfw' )
+            modprobe( 'ipfw' )
+        if 'ipfw_nat.ko' not in klds:
+            modprobe( 'ipfw_nat' )
