@@ -1061,7 +1061,7 @@ class UserSwitch( Switch ):
 class OVSSwitch( Switch ):
     "Open vSwitch switch. Depends on ovs-vsctl."
 
-    def __init__( self, name, failMode='secure', datapath='kernel',
+    def __init__( self, name, failMode='secure', datapath='user',
                   inband=False, protocols=None,
                   reconnectms=1000, stp=False, batch=False, **params ):
         """name: name for switch
@@ -1101,14 +1101,15 @@ class OVSSwitch( Switch ):
                    'that ovsdb-server is running, and that\n'
                    '"ovs-vsctl show" works correctly.\n'
                    'You may wish to try '
-                   '"service openvswitch-switch start".\n' )
+                   '"service ovsdb-server onestart"\n'
+                   'followed by "service ovs-vswitchd onestart".\n' )
             exit( 1 )
         version = quietRun( 'ovs-vsctl --version' )
         cls.OVSVersion = findall( r'\d+\.\d+', version )[ 0 ]
 
     @classmethod
     def isOldOVS( cls ):
-        "Is OVS ersion < 1.10?"
+        "Is OVS version < 1.10?"
         return ( StrictVersion( cls.OVSVersion ) <
                  StrictVersion( '1.10' ) )
 
@@ -1136,7 +1137,7 @@ class OVSSwitch( Switch ):
         "Connect a data port"
         self.vsctl( 'add-port', self, intf )
         self.cmd( 'ifconfig', intf, 'up' )
-        self.TCReapply( intf )
+        # self.TCReapply( intf )
 
     def detach( self, intf ):
         "Disconnect a data port"
@@ -1181,7 +1182,7 @@ class OVSSwitch( Switch ):
         opts = ( ' other_config:datapath-id=%s' % self.dpid +
                  ' fail_mode=%s' % self.failMode )
         if not self.inband:
-            opts += ' other-config:disable-in-band=true'
+            opts += ' other_config:disable-in-band=true'
         if self.datapath == 'user':
             opts += ' datapath_type=netdev'
         if self.protocols and not self.isOldOVS():
@@ -1225,9 +1226,9 @@ class OVSSwitch( Switch ):
                     self.bridgeOpts() +
                     intfs )
         # If necessary, restore TC config overwritten by OVS
-        if not self.batch:
-            for intf in self.intfList():
-                self.TCReapply( intf )
+        # if not self.batch:
+        #     for intf in self.intfList():
+        #         self.TCReapply( intf )
 
     # This should be ~ int( quietRun( 'getconf ARG_MAX' ) ),
     # but the real limit seems to be much lower

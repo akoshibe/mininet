@@ -632,7 +632,7 @@ class Mininet( object ):
         # Check for downed link
         if 'connect: Network is unreachable' in pingOutput:
             return 1, 0
-        r = r'(\d+) packets transmitted, (\d+) received'
+        r = r'(\d+) packets transmitted, (\d+)'
         m = re.search( r, pingOutput )
         if m is None:
             error( '*** Error: could not parse ping output: %s\n' %
@@ -694,7 +694,7 @@ class Mininet( object ):
         m = re.search( r, pingOutput )
         if m is not None:
             return errorTuple
-        r = r'(\d+) packets transmitted, (\d+) received'
+        r = r'(\d+) packets transmitted, (\d+)'
         m = re.search( r, pingOutput )
         if m is None:
             error( '*** Error: could not parse ping output: %s\n' %

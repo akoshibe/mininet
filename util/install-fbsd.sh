@@ -25,9 +25,10 @@ fi
 # Get directory containing mininet folder
 MININET_DIR=$( CDPATH= cd -- "$( dirname -- "$0" )/../.." && pwd -P )
 
-# install/do everything
+# install everything
 all () {
     mn_deps
+    ovs
 }
 
 # base (non-OpenFlow) bits - Mininet Python bits, dependencies
@@ -61,6 +62,16 @@ mn_undo () {
     cd ${cur}
 }
 
+# install/uninstall just OVS
+ovs () {
+    if [ "$1" = '-u' ]; then
+        $remove openvswitch
+        return
+    else
+        $install openvswitch
+    fi
+}
+
 usage () {
     printf '%s\n' \
         "" \
@@ -70,19 +81,23 @@ usage () {
         " -a: (default) install (A)ll packages" \
         " -h: print this (H)elp message" \
         " -n: install Mini(N)et dependencies + core files" \
-        " -u: (u)ninstall Mininet core files"
+        " -r: remove existing Open vSwitch packages" \
+        " -u: (u)ninstall Mininet core files" \
+        " -v: install Open (V)switch"
     exit 2
 }
 
 if [ $# -eq 0 ]; then
     all
 else
-    while getopts 'ahnu' OPTION; do
+    while getopts 'ahnruv' OPTION; do
         case $OPTION in
             a)    all ;;
             h)    usage ;;
+            r)    ovs -u ;;
             n)    mn_deps ;;
             u)    mn_undo ;;
+            v)    ovs ;;
             ?)    usage ;;
         esac
     done
