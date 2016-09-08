@@ -139,8 +139,7 @@ class Node( object ):
         # stop.timeout=0 : don't wait for a process to exit in a jail
         if self.inNamespace:
             cmd = [ 'jail', '-ci', 'vnet', 'allow.raw_sockets', 'persist',
-                    'stop.timeout=0', 'name=' + self.name,
-                    'host.hostname=' + 'mininet.' + self.name, 'path=/' ]
+                    'stop.timeout=0', 'name=mininet:' + self.name, 'path=/' ]
             ret = int( self._popen(
                        cmd, stdout=PIPE ).communicate()[ 0 ][ :-1 ] )
             try:

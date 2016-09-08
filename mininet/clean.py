@@ -26,10 +26,12 @@ def sh( cmd ):
 def killprocs( pattern ):
     "Reliably terminate processes matching a pattern (including args)"
     sh( 'pkill -9 -f %s' % pattern )
-    # Make sure they are gone
+    # Make sure they are gone - don't try to kill zombies
     while True:
         try:
-            pids = co( [ 'pgrep', '-f', pattern ] )
+            p1 = Popen( [ 'ps' ], stdout=PIPE )
+            pids = co( [ 'awk', '/%s/{print $1}' % pattern ], stdin=p1.stdout )
+            p1.stdout.close()
         except CalledProcessError:
             pids = ''
         if pids:
@@ -102,11 +104,15 @@ class Cleanup( object ):
             sh( 'ifconfig tap9 destroy' )
 
         info( "*** Killing stale mininet node processes\n" )
-        killprocs( 'mininet:' )
+        killprocs( '[m]ininet:' )
+        nodes = sh( 'jls name' ).split('\n')
+        for node in nodes:
+            if 'mininet:' in node:
+                sh( 'jail -r %s 2>/dev/null' % node )
 
         info( "*** Shutting down stale tunnels\n" )
         killprocs( 'Tunnel=Ethernet' )
-        killprocs( '.ssh/mn')
+        killprocs( '.ssh\/mn')
         sh( 'rm -f ~/.ssh/mn/*' )
 
         # Call any additional cleanup code if necessary
