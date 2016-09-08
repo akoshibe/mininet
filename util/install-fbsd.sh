@@ -49,7 +49,6 @@ mn_deps () {
     printf '%s\n' "Installing Mininet core"
     cur=$(pwd -P)
     cd ${MININET_DIR}/mininet
-    ln -F mnexec-fbsd.c mnexec.c
     sudo make install
     cd ${cur}
 }

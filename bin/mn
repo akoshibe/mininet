@@ -129,6 +129,7 @@ class MininetRunner( object ):
         self.options = None
         self.args = None  # May be used someday for more CLI scripts
         self.validate = None
+        self.wait = True
 
         self.parseArgs()
         self.setup()
@@ -184,6 +185,10 @@ class MininetRunner( object ):
         else:
             parser.values.nat_args = []
             parser.values.nat_kwargs = {}
+
+    def waitConnected( self, net ):
+        if self.wait:
+            net.waitConnected()
 
     def parseArgs( self ):
         """Parse command-line args and return options object.
@@ -315,6 +320,9 @@ class MininetRunner( object ):
                        for c in self.options.controller ]
         link = customClass( LINKS, self.options.link )
 
+        # if the only controller is Null, no need to wait
+        if self.options.controller == [ 'none' ]:
+            self.wait = False
         if self.validate:
             self.validate( self.options )
 
@@ -371,14 +379,14 @@ class MininetRunner( object ):
             elif test == 'none':
                 pass
             elif test == 'all':
-                mn.waitConnected()
+                self.waitConnected( mn )
                 mn.start()
                 mn.ping()
                 mn.iperf()
             elif test == 'cli':
                 cli( mn )
             elif test != 'build':
-                mn.waitConnected()
+                self.waitConnected( mn )
                 getattr( mn, test )()
 
         if self.options.post:

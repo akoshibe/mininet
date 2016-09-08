@@ -21,7 +21,6 @@ all: codecheck test
 clean:
 	rm -rf build dist *.egg-info *.pyc $(MNEXEC) $(MANPAGES) $(DOCDIRS)
 	rm mininet/*.pyc
-	unlink mnexec.c
 
 codecheck: $(PYSRC)
 	-echo "Running code check"
