@@ -1503,12 +1503,10 @@ class Ryu( Controller ):
         """Init.
         name: name to give controller.
         ryuArgs: arguments and modules to pass to Ryu"""
-        homeDir = quietRun( 'printenv HOME' ).strip( '\r\n' )
-        ryuCoreDir = '%s/ryu/ryu/app/' % homeDir
         if not ryuArgs:
             warn( 'warning: no Ryu modules specified; '
                   'running simple_switch only\n' )
-            ryuArgs = [ ryuCoreDir + 'simple_switch.py' ]
+            ryuArgs = [ 'ryu.app.simple_switch' ]
         elif type( ryuArgs ) not in ( list, tuple ):
             ryuArgs = [ ryuArgs ]
 
@@ -1516,7 +1514,6 @@ class Ryu( Controller ):
                              command='ryu-manager',
                              cargs='--ofp-tcp-listen-port %s ' +
                              ' '.join( ryuArgs ),
-                             cdir=ryuCoreDir,
                              **kwargs )
 
 

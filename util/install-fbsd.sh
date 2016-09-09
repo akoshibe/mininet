@@ -29,6 +29,7 @@ MININET_DIR=$( CDPATH= cd -- "$( dirname -- "$0" )/../.." && pwd -P )
 all () {
     mn_deps
     ovs
+    ryu
 }
 
 # base (non-OpenFlow) bits - Mininet Python bits, dependencies
@@ -61,7 +62,7 @@ mn_undo () {
     cd ${cur}
 }
 
-# install/uninstall just OVS
+# Install/uninstall OVS.
 ovs () {
     if [ "$1" = '-u' ]; then
         $remove openvswitch
@@ -69,6 +70,23 @@ ovs () {
     else
         $install openvswitch
     fi
+}
+
+# Install RYU. `pip install ryu` should actually be sufficient.
+ryu () {
+    printf '%s\n' "Installing RYU..."
+
+    $install python py27-setuptools py27-eventlet py27-routes \
+        py27-webob py27-paramiko py27-pip py27-msgpack-python
+    pip install oslo.config
+
+    # fetch RYU
+    cd $MININET_DIR
+    git clone git://github.com/osrg/ryu.git ryu
+    cd ryu
+
+    # install ryu
+    sudo python ./setup.py install
 }
 
 usage () {
@@ -82,14 +100,15 @@ usage () {
         " -n: install Mini(N)et dependencies + core files" \
         " -r: remove existing Open vSwitch packages" \
         " -u: (u)ninstall Mininet core files" \
-        " -v: install Open (V)switch"
+        " -v: install Open (V)switch" \
+        " -y: install R(y)u Controller"
     exit 2
 }
 
 if [ $# -eq 0 ]; then
     all
 else
-    while getopts 'ahnruv' OPTION; do
+    while getopts 'ahnruvy' OPTION; do
         case $OPTION in
             a)    all ;;
             h)    usage ;;
@@ -97,6 +116,7 @@ else
             n)    mn_deps ;;
             u)    mn_undo ;;
             v)    ovs ;;
+            y)    ryu ;;
             ?)    usage ;;
         esac
     done
