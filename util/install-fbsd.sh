@@ -4,7 +4,6 @@
 # It follows the logic/contents of `install.sh`.
 
 dist=$(uname -s)
-ver=$(uname -K)
 arch=$(uname -m)
 
 if [ "${dist}" = "FreeBSD" ]; then
@@ -34,13 +33,11 @@ all () {
 
 # base (non-OpenFlow) bits - Mininet Python bits, dependencies
 mn_deps () {
-    # check for VIMAGE support - how correlated is uname -K to -r?
-    if [ ${ver} -lt 1100000 ]; then
-        if [ ! "$(sysctl kern.conftxt | grep 'VIMAGE\|DUMMYNET')" ]; then
-            printf '%s\n' "VIMAGE and DUMMYNET are required but seem missing" \
-                          "Retry after rebuilding your kernel with these options"
-            exit 1
-	fi
+    # check for VIMAGE support
+    if [ ! "$(sysctl kern.conftxt | grep 'VIMAGE\|DUMMYNET')" ]; then
+        printf '%s\n' "VIMAGE and DUMMYNET are required but seem missing" \
+                      "Retry after rebuilding your kernel with these options"
+        exit 1
     fi
 
     $install python socat psmisc xterm openssh-portable iperf help2man bash\
@@ -68,7 +65,14 @@ ovs () {
         $remove openvswitch
         return
     else
-        $install openvswitch
+        $install openvswitch && \
+        printf '%s\n' "You may wish to add the following to rc.conf:" \
+                      '    ovsdb_server_enable="YES"' \
+                      '    ovs_vswitchd_enable="YES"'
+        # start OVSDB and vswitchd
+        printf '%s\n' "starting openvswitch bits"
+        service ovsdb-server onestart
+        service ovs-vswitchd onestart
     fi
 }
 
