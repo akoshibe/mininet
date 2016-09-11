@@ -1,5 +1,5 @@
-Mininet - FreeBSD Edition
-=========================
+Mininet - FreeBSD Edition (A platform port)
+-------------------------------------------
 
 Based on Mininet 2.3.0d1
 
@@ -9,7 +9,7 @@ surprised if things are unsupported and/or broken!
 
 ### What is Mininet?
 
-Shamelessly repurposing the Mininet README:
+Shamelessly repurposing the Mininet README as an intro/recap:
 
 Mininet emulates a complete network of hosts, links, and switches
 on a single machine. To create a sample two-host, one-switch network,
@@ -25,10 +25,6 @@ hardware with minimal changes for full line-rate execution.
 ### Features
 
 This port currently supports:
-
-* Nodes/Hosts implemented with vnet jails and Links with epairs
-
-* "Classic" bridge and NAT nodes using if_bridge and `ipfw`
 
 * [Ryu](https://osrg.github.io/ryu/) as the stock controller (i.e.,
   installable from the supplied install script)
@@ -70,6 +66,6 @@ Information on Mininet itself, along with a walkthrough and an
 introduction to its Python API, can be found on the
 [Mininet Web Site](http://mininet.org).
 
-Information specific to this Mininet port, including a detailed
-list of supported and planned features, will be made available
-soon.
+Information specific to this Mininet port can be found here:
+
+<https://wiki.freebsd.org/Mininet>
