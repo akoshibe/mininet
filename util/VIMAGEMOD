@@ -1,6 +1,6 @@
 # VIMAGEMOD - sample kernel configuration file for VIMAGE support in jails.
 # 
-# In general, the following steps should get you up and running with this
+# At a minimum, the following steps should get you up and running with this
 # configuration file:
 #
 # (assuming that this is amd64 and you have the sources)
@@ -10,8 +10,7 @@
 # # make installkernel KERNCONF=VIMAGEMOD
 # (reboot)
 # 
-# If you have not compiled a kernel before, please refer to the following
-# to get a better idea of what's involved:
+# For a better idea of what is involved, please refer to the following:
 #
 # https://www.freebsd.org/handbook/kernelconfig-config.html
 #
@@ -21,4 +20,4 @@ ident VIMAGEMOD
 
 options VIMAGE
 options DUMMYNET
-options MROUTING
+options HZ=1000

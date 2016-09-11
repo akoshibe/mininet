@@ -35,8 +35,10 @@ all () {
 mn_deps () {
     # check for VIMAGE support
     if [ ! "$(sysctl kern.conftxt | grep 'VIMAGE\|DUMMYNET')" ]; then
-        printf '%s\n' "VIMAGE and DUMMYNET are required but seem missing" \
-                      "Retry after rebuilding your kernel with these options"
+        printf '%s\n' \
+            "*** VIMAGE and DUMMYNET are required but seem to be missing!"\
+            "Please retry after rebuilding the kernel with these options."\
+            "Take a look at util/VIMAGEMOD for a sample kernel config."
         exit 1
     fi
 
