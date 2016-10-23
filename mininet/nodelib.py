@@ -10,7 +10,7 @@ from mininet.moduledeps import pathCheck, lsmod, modprobe
 from mininet.util import quietRun
 
 class IfBridge( Switch ):
-    "FreeBSD if_bridge device Node (with optional spanning tree)."
+    "FreeBSD if_bridge(4) Node (with optional spanning tree)."
 
     nextPrio = 100  # next bridge priority for spanning tree
 
@@ -209,3 +209,4 @@ class NAT( Node ):
             modprobe( 'ipfw' )
         if 'ipfw_nat.ko' not in klds:
             modprobe( 'ipfw_nat' )
+

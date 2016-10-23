@@ -95,7 +95,8 @@ class Node( object ):
                          # replace with Port objects, eventually ?
         self.nameToIntf = {}  # dict of interface names to Intfs
 
-        self.jid = None  # host-unique identifier when inNamespace=True
+        # host-unique identifier when inNamespace=True. Otherwise, None.
+        self.jid = None
 
         # Make pylint happy
         ( self.shell, self.execed, self.pid, self.stdin, self.stdout,
@@ -106,7 +107,7 @@ class Node( object ):
 
         # Start command interpreter shell
         self.startShell()
-        # self.mountPrivateDirs()
+        self.mountPrivateDirs()
 
     # File descriptor to node mapping support
     # Class variables and methods
@@ -185,30 +186,34 @@ class Node( object ):
         self.cmd( 'unset HISTFILE; stty -echo; set +m' )
 
     def mountPrivateDirs( self ):
-        "mount private directories"
+        "mount private directories."
         # Avoid expanding a string into a list of chars
         assert not isinstance( self.privateDirs, basestring )
         for directory in self.privateDirs:
             if isinstance( directory, tuple ):
-                # mount given private directory
-                privateDir = directory[ 1 ] % self.__dict__
-                mountPoint = directory[ 0 ]
-                self.cmd( 'mkdir -p %s' % privateDir )
-                self.cmd( 'mkdir -p %s' % mountPoint )
-                self.cmd( 'mount --bind %s %s' %
-                               ( privateDir, mountPoint ) )
+                # mount given private directory onto mountpoint
+                mountPoint = directory[ 1 ] % self.__dict__
+                privateDir = directory[ 0 ]
+                diffDir = mountPoint + '_diff'
+                quietRun( 'mkdir -p %s %s %s' %
+                               ( privateDir, mountPoint, diffDir ) )
+                quietRun( 'mount -t nullfs %s %s' % ( privateDir, mountPoint ) )
+                quietRun( 'mount -t unionfs %s %s' % ( diffDir, mountPoint ) )
+                #self.cmd( 'mount --bind %s %s' %
+                #               ( privateDir, mountPoint ) )
             else:
-                # mount temporary filesystem on directory
-                self.cmd( 'mkdir -p %s' % directory )
-                self.cmd( 'mount -n -t tmpfs tmpfs %s' % directory )
+                # mount temporary filesystem on directory + name
+                quietRun( 'mkdir -p %s' % directory + self.name )
+                quietRun( 'mount -n -t tmpfs tmpfs %s' % directory + self.name )
 
     def unmountPrivateDirs( self ):
-        "mount private directories"
+        "unmount private directories"
         for directory in self.privateDirs:
             if isinstance( directory, tuple ):
-                self.cmd( 'umount ', directory[ 0 ] )
+                quietRun( 'umount %s' % directory[ 1 ] % self.__dict__ )
+                quietRun( 'umount %s' % directory[ 1 ] % self.__dict__ )
             else:
-                self.cmd( 'umount ', directory )
+                quietRun( 'umount %s' % directory + self.name )
 
     def _popen( self, cmd, **params ):
         """Internal method: spawn and return a process

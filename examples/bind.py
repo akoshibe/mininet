@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 """
 bind.py: Bind mount example
@@ -35,7 +35,7 @@ on '/var/mn'
 """
 
 from mininet.net import Mininet
-from mininet.node import Host
+from mininet.node import Host, Ryu
 from mininet.cli import CLI
 from mininet.topo import SingleSwitchTopo
 from mininet.log import setLogLevel, info
@@ -53,7 +53,7 @@ def testHostWithPrivateDirs():
                       '/var/mn' ]
     host = partial( Host,
                     privateDirs=privateDirs )
-    net = Mininet( topo=topo, host=host )
+    net = Mininet( topo=topo, host=host, controller=Ryu )
     net.start()
     directories = [ directory[ 0 ] if isinstance( directory, tuple )
                     else directory for directory in privateDirs ]
