@@ -825,7 +825,7 @@ class Mininet( object ):
         debug( 'Client output: %s\n' % cliout )
         servout = ''
         # We want the last *b/sec from the iperf server output
-        # for TCP, there are two fo them because of waitListening
+        # for TCP, there are two of them because of waitListening
         count = 2 if l4Type == 'TCP' else 1
         while len( re.findall( '/sec', servout ) ) < count:
             servout += server.monitor( timeoutms=5000 )

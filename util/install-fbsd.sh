@@ -84,7 +84,7 @@ ryu () {
 
     $install python py27-setuptools py27-eventlet py27-routes \
         py27-webob py27-paramiko py27-pip py27-msgpack-python
-    pip install oslo.config
+    pip install oslo.config tinyrpc ovs
 
     # fetch RYU
     cd $MININET_DIR

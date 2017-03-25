@@ -323,8 +323,12 @@ class Node( object ):
 
     def sendInt( self, intr=chr( 3 ) ):
         "Interrupt running command."
-        debug( 'sendInt: writing chr(%d)\n' % ord( intr ) )
-        self.write( intr )
+        # find and SIGINT the process. Sending a chr(3) should work, but
+        # is not. Until that is fixed, we do this.
+        #debug( 'sendInt: writing chr(%d)\n' % ord( intr ) )
+        #self.write( intr )
+        debug( 'sendInt: sending INT to: %s' % self.lastCmd )
+        quietRun( "pkill -2 -f -- '%s'" % self.lastCmd )
 
     def monitor( self, timeoutms=None, findPid=True ):
         """Monitor and return the output of a command.
