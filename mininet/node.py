@@ -684,6 +684,94 @@ class Host( Node ):
     "A host is simply a Node"
     pass
 
+class ResourceLimitedHost( Host ):
+    """Resource-limited host, in the same niche as CPULimitedHost. A combination
+       of `rctl(8)` and `cpuset(1)` is used to constrain the host resources.
+       Here, a host is considered to be the jail."""
+
+    # scheduler is fixed. Default is sched_ule(4).
+    def __init__( self, name, **kwargs ):
+        Host.__init__( self, name, **kwargs )
+        self.period_us = kwargs.get( 'period_us', 100000 )
+
+    def setCPUFrac( self, cpu, sched=None ):
+        """Set overall CPU fraction for this host
+           f: CPU bandwidth limit (nonzero float)"""
+        if cpu == -1:
+            return
+        if cpu < 0:
+            error( '*** error: fraction must be a positive value' )
+            return
+        pcpu = int( cpu * 100 * numCores() )
+        cmd = 'rctl -a jail:%s:pcpu:deny=%d' % ( self.jid, pcpu )
+        quietRun( cmd )
+
+    def setCPUs( self, cores, mems=0 ):
+        """Specify cores that host will run on."""
+        # do we want to scale back/up pcpu?
+        # extract valid cores to a list:  mask: 0, 1 -> [0,1]
+        avail = quietRun( 'cpuset -g -j %s' % self.jid ).split()
+        print( 'avail: %s' % avail )
+        print( 'cores: %s' % str( cores ) )
+        if avail[2] == "mask:":
+            valid = map( ( lambda x : int( x.split( ',' )[0] ) ), avail[ 3: ] )
+
+        if isinstance( cores, list ):
+            for c in cores:
+                if c not in valid:
+                    error( '*** error: cannot assign target to core %d' % c )
+                    return
+            args = ','.join( [ str( c ) for c in cores ] )
+        else:
+            if cores not in valid:
+                error( '*** error: cannot assign target to core %d' % c )
+                return
+            else:
+                args = str( cores )
+
+        cmd = 'cpuset -l %s -j %s' % ( args, self.jid )
+        print( 'cmd: %s' % cmd )
+        quietRun( cmd )
+
+    def rulesDel( self ):
+        """Remove `rctl` rules associated with this host"""
+        _out, _err, exitcode = errRun( 'rctl -r jail:%s' % self.jid )
+        return exitcode
+
+    def cleanup( self ):
+        "Clean up Node, then clean up our resource allocation rules"
+        super( CPULimitedHost, self ).cleanup()
+        # no need/means to remove cpuset rules - they die with host
+        retry( retries=3, delaySecs=.1, fn=self.rulesDel )
+
+    def config( self, cpu=-1, cores=None, **params ):
+        """cpu: desired overall system CPU fraction
+           cores: (real) core(s) this host can run on
+           params: parameters for Node.config()"""
+        r = Node.config( self, **params )
+        # Was considering cpu={'cpu': cpu , 'sched': sched}, but
+        # that seems redundant
+        self.setParam( r, 'setCPUFrac', cpu=cpu )
+        self.setParam( r, 'setCPUs', cores=cores )
+        return r
+
+    def getCPUTime( self, pid ):
+        """Get CPU time of a process identified by pid. We do this via
+           procstat(1). It is janky, but 10.x procstat doesn't do libxo
+           output."""
+        res = quietRun( 'procstat -rh %s' % pid ).split('\n')
+        c = 0;
+        time = 0.0
+        for line in res:
+            if 'time' in line:
+                # the microsecond portion of user/kernel time
+                time += float(line.split(':')[-1])
+                c+=1
+            # got the two lines we need.
+            if c == 2:
+                break
+        return time
+
 class CPULimitedHost( Host ):
 
     "CPU limited host"
