@@ -693,26 +693,28 @@ class ResourceLimitedHost( Host ):
     def __init__( self, name, **kwargs ):
         Host.__init__( self, name, **kwargs )
         self.period_us = kwargs.get( 'period_us', 100000 )
+        self.pcpu = -1
 
-    def setCPUFrac( self, cpu, sched=None ):
+    def setCPUFrac( self, cpu, sched=None, numc=None ):
         """Set overall CPU fraction for this host
-           f: CPU bandwidth limit (nonzero float)"""
+           cpu: CPU bandwidth limit (nonzero float)
+           sched: Scheduler (ignored but exists for compatibility)
+           numc: Number of cores"""
         if cpu == -1:
             return
         if cpu < 0:
             error( '*** error: fraction must be a positive value' )
             return
-        pcpu = int( cpu * 100 * numCores() )
-        cmd = 'rctl -a jail:%s:pcpu:deny=%d' % ( self.jid, pcpu )
+        self.pcpu = cpu
+        cct = numCores() if numc is None else numc
+        cmd = 'rctl -a jail:%s:pcpu:deny=%d' % ( self.jid, ( cpu * 100 * cct ) )
         quietRun( cmd )
 
     def setCPUs( self, cores, mems=0 ):
         """Specify cores that host will run on."""
         # do we want to scale back/up pcpu?
         # extract valid cores to a list:  mask: 0, 1 -> [0,1]
-        avail = quietRun( 'cpuset -g -j %s' % self.jid ).split()
-        print( 'avail: %s' % avail )
-        print( 'cores: %s' % str( cores ) )
+        avail = quietRun( 'cpuset -g' ).split()
         if avail[2] == "mask:":
             valid = map( ( lambda x : int( x.split( ',' )[0] ) ), avail[ 3: ] )
 
@@ -722,16 +724,20 @@ class ResourceLimitedHost( Host ):
                     error( '*** error: cannot assign target to core %d' % c )
                     return
             args = ','.join( [ str( c ) for c in cores ] )
+            cct = len( cores )
         else:
             if cores not in valid:
                 error( '*** error: cannot assign target to core %d' % c )
                 return
             else:
                 args = str( cores )
+                cct = 1
 
         cmd = 'cpuset -l %s -j %s' % ( args, self.jid )
-        print( 'cmd: %s' % cmd )
         quietRun( cmd )
+
+        #update the resourcelimit to scale
+        self.setCPUFrac( self.pcpu, numc=cct )
 
     def rulesDel( self ):
         """Remove `rctl` rules associated with this host"""
@@ -740,7 +746,7 @@ class ResourceLimitedHost( Host ):
 
     def cleanup( self ):
         "Clean up Node, then clean up our resource allocation rules"
-        super( CPULimitedHost, self ).cleanup()
+        super( ResourceLimitedHost, self ).cleanup()
         # no need/means to remove cpuset rules - they die with host
         retry( retries=3, delaySecs=.1, fn=self.rulesDel )
 

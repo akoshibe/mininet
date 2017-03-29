@@ -873,7 +873,7 @@ class Mininet( object ):
                 if isinstance(host, ResourceLimitedHost):
                     readTime = host.getCPUTime( pids[ host ] )
                     # is procstat output per-core?
-                    outputs[ host ].append( ( readTime - time[ host ] ) * 100 )
+                    outputs[ host ].append( ( readTime - time[ host ] ) / cores * 100 )
                 else:
                     with open( '/sys/fs/cgroup/cpuacct/%s/cpuacct.usage' %
                                host, 'r' ) as f:
