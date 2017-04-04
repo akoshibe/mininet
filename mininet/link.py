@@ -45,9 +45,9 @@ class Intf( object ):
         self.mac = mac
         self.ip, self.prefixLen = None, None
 
-        # if interface is lo, we know the ip is 127.0.0.1.
+        # if interface is lo/lo0, we know the ip is 127.0.0.1.
         # This saves an ifconfig command per node
-        if self.name == 'lo0':
+        if self.name == 'lo' or self.name == 'lo0':
             self.ip = '127.0.0.1'
             self.prefixLen = 8
         # Add to node (and move ourselves if necessary )
@@ -216,6 +216,188 @@ class Intf( object ):
 
     def __str__( self ):
         return self.name
+
+
+class IFIntf( Intf ):
+    """ipfw(4)-based traffic-shaped interface similar to TCIntf, customized with
+       the dummynet(4) traffic shaper/scheduler"""
+
+    pipeNo = 1  # track number of pipes
+
+    def bwCmds( self, bw=None, bw_units=None, latency=None, enable_ecn=False,
+                enable_red=False, enable_gred=False, w_q=0.005, min_th=30 ):
+        """
+        Return commands to set bandwidth. Bandwidth is assumed in Mb. For
+        [G]RED parameters, rule of thumb of max_th = 3*min_th is followed. We
+        also say max_p is 1.0 so the CDF is not as jarring, but not much more
+        educated thought is put into it at this point. min/max_th are in slots
+        by default.
+        """
+
+        cmds = []
+        b_arg, d_arg, q_arg = '', '', ''
+        qm_alg = None
+
+        # sanity-check args and start building up the command fragments
+        if bw and bw < 0:
+            error( 'Bandwidth must be a positive value - ignoring\n'  )
+        elif bw:
+            b_arg = 'bw %d%sbit/s' % (bw, bw_units if bw_units else 'M')
+
+        if latency and latency < 0:
+            error( 'Latency must be a positive value - ignoring\n'  )
+        elif latency:
+            d_arg = 'delay %dms' % latency
+
+        if enable_red:
+            qm_alg = 'red'
+        elif enable_gred:
+            qm_alg = 'gred'
+
+        if qm_alg:
+            if ( w_q >= 0.0 and w_q <= 1.0 ) and ( min_th >= 0 ):
+                q_params = '%s/%s/%s/%s' % ( w_q, min_th, 3*min_th, 1.0 )
+                q_arg = qm_alg + ' ' + q_params
+                if enable_ecn:
+                    q_arg += ' ecn'
+            else:
+                error( 'Invalid configuration parameters for %s: w_q must be '
+                       'between 0 annd 1 (inclusive) and min_th must be a '
+                       'positive integer' % qm_alg.upper() )
+        elif enable_ecn:
+            error( 'Cannot enable ECN without queuing discipline - ignoring\n' )
+
+        cmds += [ '%s %s %s' % (b_arg, d_arg, q_arg) ]
+        return cmds
+
+    def delayCmds( self, delay=None, jitter=None, loss=None, max_queue_size=None,
+                   q_as_slots=True ):
+        """
+        Internal method: return commands for delay and loss. Since jitter is
+        not straight forward in dummynet, ignored for now. Queue size is set
+        to packet count by default (q_slots=True). If false, it is in Kbytes.
+        """
+
+        cmds = []
+
+        if delay and delay < 0:
+            error( 'Cannot set negative delay - ignoring\n' )
+        else:
+            d_arg = 'delay %sms' % delay if delay > 0 else ''
+
+        if loss:
+            if loss > 1.0 and loss <= 100.0:
+                # assume it's in percent, scale.
+                loss = loss / 100.0
+            if loss < 0:
+                error( 'Packet loss rate must be a value between 0 and 100'
+                       '(inclusive) - ignoring\n')
+            else:
+                pl_arg = 'plr %s' % loss
+        else:
+            pl_arg = ''
+
+        if max_queue_size and max_queue_size < 0:
+            error( 'Cannot set negative queue size - ignoring\n' )
+        elif max_queue_size:
+            unit = '' if q_as_slots else 'Kbytes'
+            q_arg = 'queue %s%s' % ( max_queue_size, unit )
+        else:
+            q_arg = ''
+
+        cmds += [ '%s %s %s' % (d_arg, pl_arg, q_arg) ]
+        return cmds
+
+    def config( self, bw=None, delay=None, jitter=None, loss=None,
+                disable_gro=True, speedup=0, use_hfsc=False, use_tbf=False,
+                latency_ms=None, enable_ecn=False, enable_red=False,
+                enable_gred=False, max_queue_size=None, w_q=0.005, min_th=30,
+                q_as_slots=True, **params ):
+        """
+        Configure the port and set its properties. IFIntf takes the same
+        parameters as TCIntf to be drop-in-replacement, but currently ignores
+        disable_gro, use_hfsc, and use_tbf.
+        """
+
+        result = Intf.config( self, **params)
+
+        # Optimization: return if nothing else to configure
+        # Question: what happens if we want to reset things?
+        if ( bw is None and not delay and not loss
+             and max_queue_size is None ):
+            return
+
+        # Below: follow same format as TCIntf
+        cmds = []
+
+        cmds += self.bwCmds( bw=bw, latency=latency_ms, enable_ecn=enable_ecn,
+                             enable_red=enable_red, enable_gred=enable_gred,
+                             w_q=w_q, min_th=min_th )
+
+        # try to interpret value as int, janky
+        d_val = int( delay[ 0:-2 ] ) if 'ms' in str(delay) else delay
+        cmds += self.delayCmds( delay=d_val, jitter=jitter, loss=loss,
+                                max_queue_size=max_queue_size,
+                                q_as_slots=q_as_slots )
+
+        # Ugly but functional: display configuration info
+        stuff = ( ( [ '%.2fMbit' % bw ] if bw is not None else [] ) +
+                  ( [ '%s delay' % delay ] if delay is not None else [] ) +
+                  # ( [ '%s jitter' % jitter ] if jitter is not None else [] ) +
+                  ( ['%.5f%% loss' % loss ] if loss is not None else [] ) +
+                  ( [ 'RED' ] if enable_red else [ 'GRED' ] if enable_gred
+                    else [] ) +
+                  ( [ 'ECN' ] if enable_ecn and ( enable_red or enable_gred )
+                    else [] ) )
+        info( '(' + ' '.join( stuff ) + ') ' )
+
+        # Execute all the commands in our node
+        debug("at map stage w/cmds: %s\n" % cmds)
+        outputs = [ self.ipfw(cmd) for cmd in cmds ]
+        for output in outputs:
+            if output != '':
+                error( "*** Error: %s" % output )
+        debug( "cmds:", cmds, '\n' )
+        debug( "outputs:", outputs, '\n' )
+        result[ 'tcoutputs'] = outputs
+
+        return result
+
+    def mk_pipe( self, direction ):
+        n = IFIntf.pipeNo
+        c = 'ipfw add pipe %d from any to any %s via %s' % ( n, direction,
+            self.name )
+        debug(" *** executing command: %s\n" % c)
+        IFIntf.pipeNo += 1
+        return c, n
+
+    def mk_config( self, pipeno, cmd ):
+        c = 'ipfw pipe %d config %s' % ( pipeno, cmd )
+        debug(" *** executing command: %s\n" % c)
+        return c
+
+    def ipfw( self, cmd ):
+        """
+        Runs the ipfw/dummynet commands supplied. Setup per direction is:
+
+        ipfw add pipe n <filter rules>
+        ipfw pipe n <dummynet configs>
+        """
+        res = ''
+
+        # set up pipes
+        c_in, n_in = self.mk_pipe( 'in' )
+        c_out, n_out = self.mk_pipe( 'out' )
+        res += self.cmd( c_in )
+        res += self.cmd( c_out )
+
+        # configure pipes with traffic shaping
+        icfg = self.mk_config( n_in, cmd )
+        ocfg = self.mk_config( n_out, cmd )
+        res += self.cmd( icfg )
+        res += self.cmd( ocfg )
+
+        return res
 
 
 class TCIntf( Intf ):
@@ -474,7 +656,7 @@ class Link( object ):
         self.intf1 = None
         self.intf2.delete()
         self.intf2 = None
-    
+
     def stop( self ):
         "Override to stop and clean up link as needed"
         self.delete()
@@ -530,6 +712,21 @@ class TCLink( Link ):
                        intfName1=intfName1, intfName2=intfName2,
                        cls1=TCIntf,
                        cls2=TCIntf,
+                       addr1=addr1, addr2=addr2,
+                       params1=params,
+                       params2=params )
+
+class IFLink( Link ):
+    """
+    Link with ipfw interfaces (IFIntf) configured via opts
+    """
+    def __init__( self, node1, node2, port1=None, port2=None,
+                  intfName1=None, intfName2=None,
+                  addr1=None, addr2=None, **params ):
+        Link.__init__( self, node1, node2, port1=port1, port2=port2,
+                       intfName1=intfName1, intfName2=intfName2,
+                       cls1=IFIntf,
+                       cls2=IFIntf,
                        addr1=addr1, addr2=addr2,
                        params1=params,
                        params2=params )
