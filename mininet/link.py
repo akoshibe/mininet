@@ -24,7 +24,7 @@ TCIntf: interface with bandwidth limiting and delay via tc
 Link: basic link class for creating veth pairs
 """
 
-from mininet.log import info, error, debug
+from mininet.log import warn, info, error, debug
 from mininet.util import makeIntfPair
 import mininet.node
 import re
@@ -224,7 +224,11 @@ class IFIntf( Intf ):
 
     pipeNo = 1  # track number of pipes
 
-    def bwCmds( self, bw=None, bw_units=None, latency=None, enable_ecn=False,
+    """
+     set up the pipes at ctor. add configs to them as more are added by config()
+    call. 
+    """
+    def bwCmds( self, bw=None, bw_units=None, enable_ecn=False,
                 enable_red=False, enable_gred=False, w_q=0.005, min_th=30 ):
         """
         Return commands to set bandwidth. Bandwidth is assumed in Mb. For
@@ -235,7 +239,7 @@ class IFIntf( Intf ):
         """
 
         cmds = []
-        b_arg, d_arg, q_arg = '', '', ''
+        b_arg, q_arg = '', ''
         qm_alg = None
 
         # sanity-check args and start building up the command fragments
@@ -243,11 +247,6 @@ class IFIntf( Intf ):
             error( 'Bandwidth must be a positive value - ignoring\n'  )
         elif bw:
             b_arg = 'bw %d%sbit/s' % (bw, bw_units if bw_units else 'M')
-
-        if latency and latency < 0:
-            error( 'Latency must be a positive value - ignoring\n'  )
-        elif latency:
-            d_arg = 'delay %dms' % latency
 
         if enable_red:
             qm_alg = 'red'
@@ -267,7 +266,7 @@ class IFIntf( Intf ):
         elif enable_ecn:
             error( 'Cannot enable ECN without queuing discipline - ignoring\n' )
 
-        cmds += [ '%s %s %s' % (b_arg, d_arg, q_arg) ]
+        cmds += [ '%s %s' % (b_arg, q_arg) ]
         return cmds
 
     def delayCmds( self, delay=None, jitter=None, loss=None, max_queue_size=None,
@@ -277,14 +276,10 @@ class IFIntf( Intf ):
         not straight forward in dummynet, ignored for now. Queue size is set
         to packet count by default (q_slots=True). If false, it is in Kbytes.
         """
-
         cmds = []
+        pl_cmd, d_arg, q_arg = '', '', ''
 
-        if delay and delay < 0:
-            error( 'Cannot set negative delay - ignoring\n' )
-        else:
-            d_arg = 'delay %sms' % delay if delay > 0 else ''
-
+        # controller packet drop using ipfw's prob parameter
         if loss:
             if loss > 1.0 and loss <= 100.0:
                 # assume it's in percent, scale.
@@ -293,20 +288,22 @@ class IFIntf( Intf ):
                 error( 'Packet loss rate must be a value between 0 and 100'
                        '(inclusive) - ignoring\n')
             else:
-                pl_arg = 'plr %s' % loss
+                pl_cmd = 'ipfw add prob %s deny all from any to any' % loss
+
+        # build command list for pipe(s)
+        if delay and delay < 0:
+            error( 'Cannot set negative delay - ignoring\n' )
         else:
-            pl_arg = ''
+            d_arg = 'delay %sms' % delay if delay > 0 else ''
 
         if max_queue_size and max_queue_size < 0:
             error( 'Cannot set negative queue size - ignoring\n' )
         elif max_queue_size:
             unit = '' if q_as_slots else 'Kbytes'
             q_arg = 'queue %s%s' % ( max_queue_size, unit )
-        else:
-            q_arg = ''
 
-        cmds += [ '%s %s %s' % (d_arg, pl_arg, q_arg) ]
-        return cmds
+        cmds += [ '%s %s' % (d_arg, q_arg) ]
+        return pl_cmd, cmds
 
     def config( self, bw=None, delay=None, jitter=None, loss=None,
                 disable_gro=True, speedup=0, use_hfsc=False, use_tbf=False,
@@ -328,18 +325,24 @@ class IFIntf( Intf ):
             return
 
         # Below: follow same format as TCIntf
-        cmds = []
-
-        cmds += self.bwCmds( bw=bw, latency=latency_ms, enable_ecn=enable_ecn,
+        cmds, outputs = [], []
+        d_val = None
+        cmds += self.bwCmds( bw=bw, enable_ecn=enable_ecn,
                              enable_red=enable_red, enable_gred=enable_gred,
                              w_q=w_q, min_th=min_th )
 
-        # try to interpret value as int, janky
-        d_val = int( delay[ 0:-2 ] ) if 'ms' in str(delay) else delay
-        cmds += self.delayCmds( delay=d_val, jitter=jitter, loss=loss,
+        if latency_ms and not delay:
+            d_val = latency_ms
+        elif delay:
+            # try to interpret value as int, janky
+            d_val = int( delay[ 0:-2 ] ) if 'ms' in str(delay) else delay
+        elif latency_ms and delay:
+            warn( 'Cannot specify both latency_ms and delay, ignoring' )
+
+        plr, c = self.delayCmds( delay=d_val, jitter=jitter, loss=loss,
                                 max_queue_size=max_queue_size,
                                 q_as_slots=q_as_slots )
-
+        cmds += c
         # Ugly but functional: display configuration info
         stuff = ( ( [ '%.2fMbit' % bw ] if bw is not None else [] ) +
                   ( [ '%s delay' % delay ] if delay is not None else [] ) +
@@ -353,27 +356,32 @@ class IFIntf( Intf ):
 
         # Execute all the commands in our node
         debug("at map stage w/cmds: %s\n" % cmds)
-        outputs = [ self.ipfw(cmd) for cmd in cmds ]
+        # apply drop rules in front of everything else
+        if plr:
+            outputs += [ self.prob(plr) ]
+        outputs += [ self.ipfw(cmd) for cmd in cmds ]
         for output in outputs:
             if output != '':
                 error( "*** Error: %s" % output )
-        debug( "cmds:", cmds, '\n' )
-        debug( "outputs:", outputs, '\n' )
         result[ 'tcoutputs'] = outputs
 
         return result
 
+    def prob( self, plcmd ):
+        c_in = plcmd + ' out via %s' % self.name
+        c_out = plcmd + ' in via %s' % self.name
+        res = self.cmd( c_in )
+        res += self.cmd( c_out )
+
     def mk_pipe( self, direction ):
         n = IFIntf.pipeNo
-        c = 'ipfw add pipe %d from any to any %s via %s' % ( n, direction,
+        c = 'ipfw add pipe %d all from any to any %s via %s' % ( n, direction,
             self.name )
-        debug(" *** executing command: %s\n" % c)
         IFIntf.pipeNo += 1
         return c, n
 
     def mk_config( self, pipeno, cmd ):
         c = 'ipfw pipe %d config %s' % ( pipeno, cmd )
-        debug(" *** executing command: %s\n" % c)
         return c
 
     def ipfw( self, cmd ):
@@ -718,7 +726,10 @@ class TCLink( Link ):
 
 class IFLink( Link ):
     """
-    Link with ipfw interfaces (IFIntf) configured via opts
+    Link with ipfw interfaces (IFIntf) configured via opts. Currently supports
+    just packet loss, bandwidth, and delay in a meaningful way given a link
+    terminates on a non-jailed node e.g. a switch, as dummynet does
+    not seem to be able to function in a jail. 
     """
     def __init__( self, node1, node2, port1=None, port2=None,
                   intfName1=None, intfName2=None,
@@ -730,3 +741,30 @@ class IFLink( Link ):
                        addr1=addr1, addr2=addr2,
                        params1=params,
                        params2=params )
+
+        # determine if either node is not jailed. That is where we apply the
+        # traffic shaping. We call it 'ifnode'.
+        self.ifint = self.intf1 if not node1.jid else self.intf2 if not node2.jid else None
+
+        if self.ifint is None:
+            warn( 'IFLink is only capable of packet loss' )
+            self.onlypl = True
+        else:
+            self.onlypl = False
+
+    def shape_link( self, ifnet=None, **params):
+        """
+        Configure the link to constrain the traffic on it. This will be on
+        ifnode, if no node is specified, given ifnode exists. If not, a node
+        must be supplied.
+        """
+        if self.onlypl:
+            if not ifnet:
+                error( 'must supply an endpoint to constrain' )
+                return
+            else:
+                ifnet.config( **params )
+        else:
+            cmdnode = self.ifint if not ifnet else ifnet
+            cmdnode.config( **params )
+
