@@ -80,9 +80,9 @@ ovs () {
 ryu () {
     printf '%s\n' "Installing RYU..."
 
-    $install python py27-setuptools py27-eventlet py27-routes \
+    $install python py27-setuptools py27-routes \
         py27-webob py27-paramiko py27-pip py27-msgpack-python
-    pip install oslo.config tinyrpc ovs
+    pip install oslo.config tinyrpc ovs eventlet==0.19.0
 
     # fetch RYU
     cd $MININET_DIR

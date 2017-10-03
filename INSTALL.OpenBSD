@@ -13,6 +13,13 @@ are using OpenBSD 6.1. It also makes use of `doas` instead of `sudo`.
 
 ### Installation
 
+From 6.2 onward, Mininet is available as a port and can be installed with
+`pkg_add`:
+
+    doas pkg_add mininet
+
+#### From source
+
 If it hasn't been already, install `git`:
 
     doas pkg_add git
@@ -25,7 +32,6 @@ The install script, `install.sh`, can be used to install the Mininet core
 libraries along with its dependencies. It must be generated first:
 
     cd mininet
-    ./configure
     util/install.sh -a #or with flag -n
 
 `install.sh -h` will give you all available options.
@@ -50,10 +56,10 @@ The Mininet core files can be uninstalled with the same install script:
 This essentially undoes `install.sh -n` minus the package dependencies,
 which is the same as `doas make uninstall`.
 
+The port can be uninstalled as any other with `pkg_delete`.
+
 
 ### Limitations and Bugs
-
-* The `iperf` CLI command is pretty unstable, and can hang or kill X.
 
 * The number of hosts (or nodes within their own 'namespaces') is limited to 255,
   the highest ID that can be given to an rdomain.

@@ -36,7 +36,6 @@ The install script, `install.sh`, can be used to install Mininet, Open
 vSwitch, and Ryu along with their dependencies. It must be generated first:
 
     cd mininet
-    ./configure
     util/install.sh -a #or with flags -nvy
 
 The script uses `pkg` to install the dependencies, so this should take just a

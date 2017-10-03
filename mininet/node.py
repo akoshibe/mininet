@@ -1027,12 +1027,10 @@ class Controller( Node ):
 
     def stop( self, *args, **kwargs ):
         """
-	Stop controller. Find processes associated with the command, and kill
-	them.
+	Stop controller by job.
 	"""
-        pids = " ".join( self.cmd( 'pgrep ' + self.command ).split( '\n' ) )
-        self.cmd( 'kill ' + pids + ' 2>/dev/null' )
-        self.cmd( 'wait ' + pids )
+        self.cmd( 'kill %' + self.command )
+        self.cmd( 'wait %' + self.command )
         super( Controller, self ).stop( *args, **kwargs )
 
     def IP( self, intf=None ):
