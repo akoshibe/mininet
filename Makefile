@@ -13,12 +13,16 @@ PDF = doc/latex/refman.pdf
 
 CFLAGS += -Wall -Wextra
 
-include config.mk
+BINDIR = `./os bindir`
+MANDIR = `./os mandir`
+PKGDIR = `./os pkgdir`
+PYTHON = `./os python`
 
 all: codecheck test
 
 clean:
-	rm -rf config.mk util/install.sh build dist *.egg-info *.pyc $(MNEXEC) $(MANPAGES) $(DOCDIRS)
+	rm -rf config.mk util/install.sh build dist *.egg-info *.pyc \
+	$(MNEXEC) $(MANPAGES) $(DOCDIRS)
 
 codecheck: $(PYSRC)
 	-echo "Running code check"
@@ -44,7 +48,8 @@ slowtest: $(MININET)
 	mininet/examples/test/runner.py -v
 
 mnexec: mnexec.c $(MN) mininet/net.py
-	cc $(CFLAGS) $(LDFLAGS) -DVERSION=\"`PYTHONPATH=. $(PYMN) --version`\" $< -o $@
+	cc $(CFLAGS) $(LDFLAGS) \
+	-DVERSION=\"`PYTHONPATH=. $(PYTHON) -B $(MN) --version`\" $< -o $@
 
 install: $(MNEXEC) $(MANPAGES)
 	install $(MNEXEC) $(BINDIR)

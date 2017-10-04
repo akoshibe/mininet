@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# everything should be in /usr/local, but to keep things unchanged for Linux...
+# Emit OS-specific parameters
 
 OS=`uname`
 case $OS in
@@ -29,9 +29,7 @@ case $OS in
         ;;
 esac
 
-ln -s $inst $(pwd)/util/install.sh
-
-echo "BINDIR=$prefix/bin"                         > config.mk
-echo "MANDIR=$mandir/man/man1"                    >> config.mk
-echo "PKGDIR=$prefix/lib/python2.7/site-packages" >> config.mk
-echo "PYTHON=$python"                             >> config.mk
+[ "$1" = bindir ] && echo $prefix/bin
+[ "$1" = mandir ] && echo $mandir/man/man1
+[ "$1" = pkgdir ] && echo $prefix/lib/python2.7/site-packages
+[ "$1" = python ] && echo $python
