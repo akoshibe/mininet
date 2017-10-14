@@ -4,7 +4,7 @@ OS-specific utility functions for Linux, counterpart to util.py.
 
 from resource import getrlimit, setrlimit, RLIMIT_NPROC, RLIMIT_NOFILE
 from mininet.log import error, warn, debug
-from mininet.util import ( quietRun, retry )
+from mininet.util import ( errRun, quietRun, retry )
 
 
 LO='lo'                   # loopback name.
