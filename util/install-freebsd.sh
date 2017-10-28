@@ -93,6 +93,18 @@ ryu () {
     sudo python ./setup.py install
 }
 
+# Install just the non-ported dependencies. Assumed chroot
+img_build () {
+    cur=$(pwd)
+    cd mininet
+    make install
+    cd $cur
+    # install ryu
+    /usr/local/bin/git clone git://github.com/osrg/ryu.git ryu
+    cd ryu
+    /usr/local/bin/python ./setup.py install
+}
+
 usage () {
     printf '%s\n' \
         "" \
@@ -101,6 +113,7 @@ usage () {
         "options:" \
         " -a: (default) install (A)ll packages" \
         " -h: print this (H)elp message" \
+        " -i: build non-port dependencies only" \
         " -n: install Mini(N)et dependencies + core files" \
         " -r: remove existing Open vSwitch packages" \
         " -u: (u)ninstall Mininet core files" \
@@ -112,12 +125,13 @@ usage () {
 if [ $# -eq 0 ]; then
     all
 else
-    while getopts 'ahnruvy' OPTION; do
+    while getopts 'ahinruvy' OPTION; do
         case $OPTION in
             a)    all ;;
             h)    usage ;;
-            r)    ovs -u ;;
+            i)    img_build ;;
             n)    mn_deps ;;
+            r)    ovs -u ;;
             u)    mn_undo ;;
             v)    ovs ;;
             y)    ryu ;;
