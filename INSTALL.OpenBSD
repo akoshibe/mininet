@@ -24,9 +24,9 @@ If it hasn't been already, install `git`:
 
     doas pkg_add git
 
-Fetch the repo and checkout this branch:
+Fetch the repo:
 
-    git fetch https://github.com/akoshibe/mininet.git
+    git clone https://github.com/akoshibe/mininet.git
 
 The install script, `install.sh`, can be used to install the Mininet core
 libraries along with its dependencies. It must be generated first:
@@ -49,14 +49,14 @@ Alternatively, a `pingall` can be run from the CLI for a similar sanity check:
 
 ### Removal
 
-The Mininet core files can be uninstalled with the same install script:
+The port can be uninstalled as any other with `pkg_delete`.
+
+Or, the Mininet core files can be uninstalled with the same install script:
 
     util/install.sh -u
 
 This essentially undoes `install.sh -n` minus the package dependencies,
 which is the same as `doas make uninstall`.
-
-The port can be uninstalled as any other with `pkg_delete`.
 
 
 ### Limitations and Bugs
@@ -69,5 +69,3 @@ The port can be uninstalled as any other with `pkg_delete`.
   Additionally, no work has been done to try to support non-native components such
   as Open vSwitch or the many controllers (NOX, POX, Ryu...)
 
-* The `dpctl` CLI command (mapped to `switchctl`) isn't constrained to one
-  switch, so it will print the same text per switch.

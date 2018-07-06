@@ -77,8 +77,7 @@ else:
 
 
 from mininet.log import info, error, warn, debug
-from mininet.util import ( quietRun, errRun, errFail, isShellBuiltin,
-                           retry )
+from mininet.util import ( quietRun, errRun, errFail, retry )
 from mininet.moduledeps import moduleDeps, pathCheck, TUN
 from mininet.link import Link, TCIntf, OVSIntf
 from re import findall
@@ -819,13 +818,14 @@ class IfSwitch( Switch ):
 
     def connected( self ):
         "Are we forwarding yet?"
-        return self.bname in self.cmd( 'switchctl show switches' )
+        return self.bname in self.cmd( 'ifconfig switch' )
 
     def start( self, controllers ):
         "Start bridge. Retain the bridge's name to save on ifconfig calls"
         rdarg = 'rdomain %d' % self.rdid if self.inNamespace else ''
-        quietRun( 'ifconfig %s create %s description "%s" up' %
-                  ( self.bname, rdarg, self.name ) )
+        dparg = 'datapath 0x%s' % self.dpid
+        quietRun( 'ifconfig %s create %s %s description "%s" up' %
+                  ( self.bname, dparg, rdarg, self.name ) )
         addcmd, stpcmd = '', ''
         for i in self.intfList():
             if i.realname and 'pair' in i.realname:
@@ -835,10 +835,15 @@ class IfSwitch( Switch ):
         quietRun( 'ifconfig ' + self.bname + addcmd )
 
         # Connect to controller using switchctl(8) using /dev/switch*
+        if not os.path.exists( self.cdev ):
+            # try to make character device, check and try to connect again
+            self.cmd( 'cd /dev/ && ./MAKEDEV ' + self.bname )
+            self.newcdev = True
+
         if os.path.exists( self.cdev ):
             args = 'switchctl connect ' + self.cdev
             ctl = controllers[ 0 ] if controllers else None
-            if not isinstance( ctl, Switchd ):
+            if ctl and isinstance( ctl, RemoteController ):
                 args += ' forward-to %s:%d' % ( ctl.IP(), ctl.port )
                 # start local Switchd instance and have it forward
                 if not IfSwitch.local:
@@ -846,26 +851,18 @@ class IfSwitch( Switch ):
                     IfSwitch.local.start()
             quietRun( args )
         else:
-            # try to make character device, check and try to connect again
-            quietRun( '/dev/MAKEDEV ' + self.bname )
-            quietRun( 'mv %s /dev/' % self.bname )
-            self.newcdev = True
-            if os.path.exists( self.cdev ):
-                # TODO : need to forward-to for RemoteController
-                quietRun( 'switchctl connect %s' % self.cdev )
-            else:
-                error( "Can't connect to controller: %s doesn't exist" %
-                       self.cdev )
-                exit( 1 )
+            error( "Can't connect to controller: %s doesn't exist" %
+                   self.cdev )
+            exit( 1 )
 
     def stop( self, deleteIntfs=True ):
         """Stop bridge
            deleteIntfs: delete interfaces? (True)"""
         quietRun( 'ifconfig %s destroy' % self.bname )
         # hack: the last switch destroys the local controller
-        last = 'switch%d' % ( IfSwitch.unitNo - 1 )
-        if self.bname == last:
-            quietRun( 'pkill switchd' )
+        if IfSwitch.local:
+            IfSwitch.local.stop()
+            IfSwitch.local = None
         if self.newcdev:
             quietRun( 'rm ' + self.cdev )
         super( IfSwitch, self ).stop( deleteIntfs )
@@ -873,7 +870,9 @@ class IfSwitch( Switch ):
     def dpctl( self, *args ):
         "Run brctl command"
         # actually switchctl
-        return self.cmd( 'switchctl', *args )
+        # choose the first switch to run switchctl(8) from
+        if self.bname == 'switch0':
+            return self.cmd( 'switchctl', *args )
 
 
 # technically there are only userspace OF switches for FreeBSD.
@@ -1027,7 +1026,8 @@ class Controller( Node ):
 
     def stop( self, *args, **kwargs ):
         """
-	Stop controller by job.
+	Stop controller. Find processes associated with the command, and kill
+        them.
 	"""
         self.cmd( 'kill %' + self.command )
         self.cmd( 'wait %' + self.command )
@@ -1191,14 +1191,20 @@ class Switchd( Controller ):
                              cargs=cmd, **kwargs )
 
     def start( self ):
-        """Start <controller> <args> on controller. Log to /tmp/cN.log"""
+        """Start <controller> <args> on controller."""
         pathCheck( self.command )
-        cout = '/tmp/' + self.name + '.log'
         if self.cdir is not None:
             self.cmd( 'cd ' + self.cdir )
-        self.cmd( self.command + ' ' + self.cargs +
-                  ' 1>' + cout + ' 2>' + cout )
+        self.cmd( self.command + ' ' + self.cargs )
+        self.ctlpid = int( quietRun( 'pgrep -n switchd' ) )
         self.execed = False
+
+    def stop( self, *args, **kwargs ):
+        try:
+            os.kill( self.ctlpid, 15 )	# send TERM, default for kill(1)
+        except OSError:
+            pass
+        super( Node, self ).stop()
 
 
 # TODO: push these uname-ey things elsewhere

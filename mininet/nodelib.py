@@ -179,7 +179,7 @@ class Bridge4( Switch ):
     def dpctl( self, *args ):
         "Run brctl command"
         # actually ifconfig
-        return quietRun( 'ifconfig', self.bname, *args )
+        return self.cmd( 'ifconfig', self.bname, *args )
 
 
 class IptablesNAT( Node ):

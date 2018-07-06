@@ -96,6 +96,21 @@ from time import sleep
 from itertools import chain, groupby
 from math import ceil
 
+from mininet.cli import CLI
+from mininet.log import info, error, debug, output, warn
+from mininet.node import ( Host, KernelSwitch, DefaultController,
+                           Controller, RctlHost )
+from mininet.nodelib import NAT
+from mininet.link import Link
+from mininet.util import ( quietRun, ensureRoot,
+                           macColonHex, ipStr, ipParse, netParse, ipAdd,
+                           waitListening )
+from mininet.term import cleanUpScreens, makeTerms
+
+def waitCount( ttype ):
+    # waitListening workaround.
+    return 2 if ttype == 'TCP' else 1
+
 plat = os.uname()[ 0 ]
 if plat == 'FreeBSD':
     from mininet.freebsd.node import Node
@@ -108,18 +123,11 @@ elif plat == 'Linux':
 else:
     from mininet.openbsd.node import Node
     from mininet.openbsd.intf import Intf
-    from mininet.openbsd.util import fixLimits, numCores
+    from mininet.openbsd.util import fixLimits, numCores, waitListening
 
-from mininet.cli import CLI
-from mininet.log import info, error, debug, output, warn
-from mininet.node import ( Host, KernelSwitch, DefaultController,
-                           Controller, RctlHost )
-from mininet.nodelib import NAT
-from mininet.link import Link
-from mininet.util import ( quietRun, ensureRoot,
-                           macColonHex, ipStr, ipParse, netParse, ipAdd,
-                           waitListening )
-from mininet.term import cleanUpScreens, makeTerms
+    def waitCount( ttype ):
+        # waitListening workaround.
+        return 1
 
 # Mininet version: should be consistent with README and LICENSE
 VERSION = "2.3.0d1"
@@ -833,7 +841,7 @@ class Mininet( object ):
             iperfArgs += '-f %s ' % fmt
         server.cmd( iperfArgs + '-s &' )
         if l4Type == 'TCP':
-            if not waitListening( client, server.IP(), port ):
+            if not waitListening( client, server, port ):
                 raise Exception( 'Could not connect to iperf on port %d'
                                  % port )
         cliout = client.cmd( iperfArgs + '-t %d -c ' % seconds +
@@ -842,7 +850,7 @@ class Mininet( object ):
         servout = ''
         # We want the last *b/sec from the iperf server output
         # for TCP, there are two fo them because of waitListening
-        count = 2 if l4Type == 'TCP' else 1
+        count = waitCount( l4Type )
         while len( re.findall( '/sec', servout ) ) < count:
             servout += server.monitor( timeoutms=5000 )
         server.sendInt()
@@ -853,6 +861,10 @@ class Mininet( object ):
             result.insert( 0, udpBw )
         output( '*** Results: %s\n' % result )
         return result
+
+    def iperfUdp( self ):
+        """Run iperf test in UDP mode"""
+        self.iperf( l4Type='UDP' )
 
     def runCpuLimitTest( self, cpu, duration=5 ):
         """run CPU limit test with 'while true' processes.

@@ -17,7 +17,7 @@ else:
     from mininet.openbsd.util import LO, moveIntf
 
 from mininet.log import info, error, warn, debug
-from mininet.util import ( quietRun, isShellBuiltin )
+from mininet.util import quietRun
 from mininet.moduledeps import pathCheck
 from mininet.link import Link
 from re import findall
@@ -77,6 +77,10 @@ class BaseNode( object ):
 
     def getShell( self, master, slave, mnopts=None ):
         # OS-specific virtualization method - overriden in system nodes
+        pass
+
+    def isShellBuiltin( self, cmd ):
+        # Shell-specific check - overridden in system nodes
         pass
 
     # Command support via shell process in namespace
@@ -211,7 +215,7 @@ class BaseNode( object ):
         if len( cmd ) > 0 and cmd[ -1 ] == '&':
             # print ^A{pid}\n so monitor() can set lastPid
             cmd += ' printf "\\001%d\\012" $! '
-        elif printPid and not isShellBuiltin( cmd ):
+        elif printPid and not self.isShellBuiltin( cmd ):
             cmd = 'mnexec -p ' + cmd
         self.write( cmd + '\n' )
         self.lastPid = None

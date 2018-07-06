@@ -356,12 +356,11 @@ class CLI( Cmd ):
         """Run dpctl (or ovs-ofctl) command on all switches.
            Usage: dpctl command [arg1] [arg2] ..."""
         args = line.split()
-        if len(args) < 1:
-            error( 'usage: dpctl command [arg1] [arg2] ...\n' )
-            return
         for sw in self.mn.switches:
-            output( '*** ' + sw.name + ' ' + ('-' * 72) + '\n' )
-            output( sw.dpctl( *args ) )
+            res = sw.dpctl( *args )
+            if res:
+                output( '*** ' + sw.name + ' ' + ('-' * 72) + '\n' )
+                output( res )
 
     def do_time( self, line ):
         "Measure time taken for any command in Mininet."

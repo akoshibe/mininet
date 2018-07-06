@@ -78,6 +78,10 @@ class Intf( BaseIntf ):
         self.ip = ips[ 0 ] if ips else None
         return self.ip
 
+    def __str__( self ):
+	real = '(%s)' % self.realname if self.realname else ''
+        return '%s%s' % ( self.name, real )
+
     @classmethod
     def next( cls ):
 	idx = Intf.index

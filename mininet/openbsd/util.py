@@ -4,7 +4,7 @@ OS-specific utility functions for OpenBSD, counterpart to util.py.
 
 from resource import getrlimit, setrlimit, RLIMIT_NPROC, RLIMIT_NOFILE
 
-from mininet.log import output, error, warn, debug
+from mininet.log import output, error, warn, info, debug
 from mininet.util import ( quietRun, retry )
 
 from mininet.openbsd.intf import Intf
@@ -178,3 +178,24 @@ def modprobe( mod ):
     """Attempt to load a specified module.
        mod: module string"""
     pass
+
+def waitListening( client, server, port=80, timeout=None ):
+    """Wait until server is listening on port.
+       returns True if server is listening"""
+    # pylint: disable=maybe-no-member
+    serverIP = server.IP().replace('.', '\.')
+    rdid = 0 if not server.rdid else server.rdid
+    cmd = ( 'netstat -nlp tcp -T %d | grep -e %s\.%s -e \*\.%s' \
+	    % ( server.rdid, serverIP, port, port ) )
+    time = 0
+    result = server.cmd( cmd )
+    while 'LISTEN' not in result:
+        if timeout and time >= timeout:
+            error( 'could not connect to %s on port %d\n' % ( server, port ) )
+            return False
+        debug( 'waiting for', server, 'to listen on port', port, '\n' )
+        info( '.' )
+        sleep( .5 )
+        time += .5
+        result = server.cmd( cmd )
+    return True

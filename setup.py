@@ -27,6 +27,10 @@ setup(
         'mininet.freebsd',
         'mininet.openbsd'
     ],
+    py_modules=[
+        'mininet.examples.cluster',
+        'mininet.examples.clustercli'
+    ],
     long_description="""
         Mininet is a network emulator which uses lightweight
         virtualization to create virtual networks for rapid

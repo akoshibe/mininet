@@ -117,7 +117,7 @@ ALTSPELLING = { 'pingall': 'pingAll', 'pingpair': 'pingPair',
 def runTests( mn, options ):
     """Run tests
        mn: Mininet object
-       option: list of test optinos """
+       option: list of test options """
     # Split option into test name and parameters
     for option in options:
         # Multiple tests may be separated by '+' for now

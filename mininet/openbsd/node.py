@@ -27,6 +27,10 @@ class Node( BaseNode ):
        one pair interface if inNamespace=True."""
 
     index=1     # rdomain ID, can only go to 255
+    builtins='. : [ alias bg break builtin cd command continue echo eval exec' \
+             ' exit export false fc fg getopts jobs kill let print pwd read' \
+             ' readonly return set shift suspend test times trap true typeset' \
+             ' ulimit umask unalias unset wait whence'
 
     def __init__( self, name, inNamespace=True, **params ):
         BaseNode.__init__( self, name, inNamespace, **params )
@@ -63,6 +67,13 @@ class Node( BaseNode ):
                           '-is', 'mininet:' + self.name ]
         return Popen( cmd, stdin=slave, stdout=slave, stderr=slave,
                       close_fds=False )
+
+    def isShellBuiltin( self, cmd ):
+        "Return True if cmd is a builtin."
+        space = cmd.find( ' ' )
+        if space > 0:
+            cmd = cmd[ :space]
+        return cmd in Node.builtins
 
     def mountPrivateDirs( self ):
         "mount private directories"
