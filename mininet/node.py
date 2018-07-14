@@ -1026,9 +1026,9 @@ class Controller( Node ):
 
     def stop( self, *args, **kwargs ):
         """
-	Stop controller. Find processes associated with the command, and kill
+        Stop controller. Find processes associated with the command, and kill
         them.
-	"""
+        """
         self.cmd( 'kill %' + self.command )
         self.cmd( 'wait %' + self.command )
         super( Controller, self ).stop( *args, **kwargs )
@@ -1201,7 +1201,7 @@ class Switchd( Controller ):
 
     def stop( self, *args, **kwargs ):
         try:
-            os.kill( self.ctlpid, 15 )	# send TERM, default for kill(1)
+            os.kill( self.ctlpid, 15 )    # send TERM, default for kill(1)
         except OSError:
             pass
         super( Node, self ).stop()

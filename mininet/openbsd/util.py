@@ -186,7 +186,7 @@ def waitListening( client, server, port=80, timeout=None ):
     serverIP = server.IP().replace('.', '\.')
     rdid = 0 if not server.rdid else server.rdid
     cmd = ( 'netstat -nlp tcp -T %d | grep -e %s\.%s -e \*\.%s' \
-	    % ( server.rdid, serverIP, port, port ) )
+            % ( server.rdid, serverIP, port, port ) )
     time = 0
     result = server.cmd( cmd )
     while 'LISTEN' not in result:
