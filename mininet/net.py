@@ -130,7 +130,7 @@ else:
         return 1
 
 # Mininet version: should be consistent with README and LICENSE
-VERSION = "2.3.0d1"
+VERSION = "2.2.2"
 
 class Mininet( object ):
     "Network emulation with hosts spawned in network namespaces."
