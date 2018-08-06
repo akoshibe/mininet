@@ -89,10 +89,12 @@ class Node( BaseNode ):
         """ Cleanup when node is killed.  """
         #self.unmountPrivateDirs()
         if self.rdid:
-            lo = 'lo%s' % self.rdid
             Popen( [ 'ifconfig', self.pair, 'destroy' ] )
-            # cleanup loopbacks that are left
-            Popen( [ 'ifconfig', lo, 'rdomain', '0', 'destroy' ] )
+        # For 6.1, the following will work, but since the rtables stick around
+        # there is probably no harm in leaving them versus trying what won't work.
+        #    # cleanup loopbacks that are left
+        #    lo = 'lo%s' % self.rdid
+        #    Popen( [ 'ifconfig', lo, 'rdomain', '0', 'destroy' ] )
         if self.shell:
             if self.shell.poll() is None:
                 killpg( self.shell.pid, signal.SIGHUP )

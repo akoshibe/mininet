@@ -8,7 +8,7 @@ Currently, the only option is native installation.
 
 This Mininet port relies on the native OpenFlow switch and controller,
 `switch(4)` and `switchd(8)`, respecitvely - meaning that it assumes that you
-are using OpenBSD 6.1. It also makes use of `doas` instead of `sudo`.
+are using OpenBSD 6.1 or later. It also makes use of `doas` instead of `sudo`.
 
 
 ### Installation
@@ -49,7 +49,8 @@ Alternatively, a `pingall` can be run from the CLI for a similar sanity check:
 
 ### Removal
 
-The port can be uninstalled as any other with `pkg_delete`.
+If it was installed as a package, it can be uninstalled as any other with
+`pkg_delete`.
 
 Or, the Mininet core files can be uninstalled with the same install script:
 
