@@ -24,11 +24,18 @@ before building a VIMAGE kernel (as you're rebooting anyways).
 
 ### Installation
 
+Mininet is now available through the ports collection, so either should work:
+
+    cd /usr/ports/net/mininet/ && make install clean   # build from ports tree
+    pkg install py27-mininet                           # install package
+
+Installing from source is also an option.
+
 If they haven't been already, install `git` and `sudo`:
 
     pkg install git-lite sudo
 
-Fetch the repo and checkout this branch:
+Fetch the repo:
 
     git fetch https://github.com/akoshibe/mininet.git
 
