@@ -17,12 +17,13 @@ BINDIR = `./os bindir`
 MANDIR = `./os mandir`
 PKGDIR = `./os pkgdir`
 PYTHON = `./os python`
+MNXDEP = `./os mnxdep`
 
 all: codecheck test
 
 clean:
 	rm -rf config.mk util/install.sh build dist *.egg-info *.pyc \
-	$(MNEXEC) $(MANPAGES) $(DOCDIRS)
+	$(MNEXEC) $(MANPAGES) $(DOCDIRS) mnexec_deps.c
 
 codecheck: $(PYSRC)
 	-echo "Running code check"
@@ -47,9 +48,13 @@ slowtest: $(MININET)
 	mininet/test/test_walkthrough.py -v
 	mininet/examples/test/runner.py -v
 
-mnexec: mnexec.c $(MN) mininet/net.py
+depends:
+	ln -s $(MNXDEP) mnexec_deps.c
+
+mnexec: depends mnexec.c mnexec_deps.c $(MN) mininet/net.py
 	cc $(CFLAGS) $(LDFLAGS) \
-	-DVERSION=\"`PYTHONPATH=. `$(PYTHON)` -B $(MN) --version`\" $< -o $@
+	-DVERSION=\"`PYTHONPATH=. `$(PYTHON)` -B $(MN) --version`\" \
+	mnexec.c mnexec_deps.c -o $@
 
 install: $(MNEXEC) $(MANPAGES)
 	install $(MNEXEC) $(BINDIR)

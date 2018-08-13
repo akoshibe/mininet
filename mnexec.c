@@ -13,117 +13,27 @@
  * Partially based on public domain setsid(1)
 */
 
-#ifdef __linux__
-#define _GNU_SOURCE
-
-#include <linux/sched.h>
-#include <limits.h>
-#include <syscall.h>
-#include <fcntl.h>
-#include <sched.h>
-#include <ctype.h>
-#include <sys/mount.h>
-
-#else  /* the BSDs */
-
 #include <sys/types.h>
 
-#endif /* __linux__ */
-
+#include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-#if !defined(VERSION)
-#define VERSION "(devel)"
-#endif
-
-void usage(char *name)
-{
-    printf("Execution utility for Mininet\n\n"
-           "Usage: %s [-cdnp] [-a pid] [-g group] [-r rtprio] cmd args...\n\n"
-           "Options:\n"
-           "  -c: close all file descriptors except stdin/out/error\n"
-           "  -d: detach from tty by calling setsid()\n"
-           "  -p: print ^A + pid\n"
-           "  -v: print version\n"
-#ifdef __linux__
-           "  -n: run in new network and mount namespaces\n"
-           "  -a pid: attach to pid's network and mount namespaces\n"
-           "  -g group: add to cgroup\n"
-           "  -r rtprio: run with SCHED_RR (usually requires -g)\n"
-#endif
-           ,
-           name);
-}
-
-
-#ifdef __linux__
-
-int setns(int fd, int nstype)
-{
-    return syscall(__NR_setns, fd, nstype);
-}
-
-/* Validate alphanumeric path foo1/bar2/baz */
-void validate(char *path)
-{
-    char *s;
-    for (s=path; *s; s++) {
-        if (!isalnum(*s) && *s != '/') {
-            fprintf(stderr, "invalid path: %s\n", path);
-            exit(1);
-        }
-    }
-}
-
-/* Add our pid to cgroup */
-void cgroup(char *gname)
-{
-    static char path[PATH_MAX];
-    static char *groups[] = {
-        "cpu", "cpuacct", "cpuset", NULL
-    };
-    char **gptr;
-    pid_t pid = getpid();
-    int count = 0;
-    validate(gname);
-    for (gptr = groups; *gptr; gptr++) {
-        FILE *f;
-        snprintf(path, PATH_MAX, "/sys/fs/cgroup/%s/%s/tasks",
-                 *gptr, gname);
-        f = fopen(path, "w");
-        if (f) {
-            count++;
-            fprintf(f, "%d\n", pid);
-            fclose(f);
-        }
-    }
-    if (!count) {
-        fprintf(stderr, "cgroup: could not add to cgroup %s\n",
-            gname);
-        exit(1);
-    }
-}
-
-#endif /* __linux__ */
+#include "mnexec.h"
 
 int main(int argc, char *argv[])
 {
     int c;
     int fd;
-#ifdef __linux__
+    char buf[PATH_MAX];
     char path[PATH_MAX];
     int nsid;
     int pid;
-    char *cwd = get_current_dir_name();
-    static struct sched_param sp;
-    char *opts = "+cdnpa:g:r:vh";
-#else
-    char *opts = "+cdpvh";
-#endif
+    char *cwd;
 
-    while ((c = getopt(argc, argv, opts)) != -1)
+    while ((c = getopt(argc, argv, OPTS)) != -1)
         switch(c) {
         case 'c':
             /* close file descriptors except stdin/out/error */
@@ -153,33 +63,15 @@ int main(int argc, char *argv[])
         case 'v':
             printf("%s\n", VERSION);
             exit(0);
-#ifdef __linux__
         case 'n':
-            /* run in network and mount namespaces */
-            if (unshare(CLONE_NEWNET|CLONE_NEWNS) == -1) {
-                perror("unshare");
-                return 1;
-            }
-
-            /* Mark our whole hierarchy recursively as private, so that our
-             * mounts do not propagate to other processes.
-             */
-
-            if (mount("none", "/", NULL, MS_REC|MS_PRIVATE, NULL) == -1) {
-                perror("remount");
-                return 1;
-            }
-
-            /* mount sysfs to pick up the new network namespace */
-            if (mount("sysfs", "/sys", "sysfs", MS_MGC_VAL, NULL) == -1) {
-                perror("mount");
+            if(try_contain() < 0) {
                 return 1;
             }
             break;
         case 'a':
             /* Attach to pid's network namespace and mount namespace */
             pid = atoi(optarg);
-            sprintf(path, "/proc/%d/ns/net", pid);
+            snprintf(path, sizeof(path), "/proc/%d/ns/net", pid);
             nsid = open(path, O_RDONLY);
             if (nsid < 0) {
                 perror(path);
@@ -190,17 +82,18 @@ int main(int argc, char *argv[])
                 return 1;
             }
             /* Plan A: call setns() to attach to mount namespace */
-            sprintf(path, "/proc/%d/ns/mnt", pid);
+            snprintf(path, sizeof(path), "/proc/%d/ns/mnt", pid);
             nsid = open(path, O_RDONLY);
             if (nsid < 0 || setns(nsid, 0) != 0) {
                 /* Plan B: chroot/chdir into pid's root file system */
-                sprintf(path, "/proc/%d/root", pid);
+                snprintf(path, sizeof(path), "/proc/%d/root", pid);
                 if (chroot(path) < 0) {
                     perror(path);
                     return 1;
                 }
             }
             /* chdir to correct working directory */
+            cwd = getcwd(buf, sizeof(buf));
             if (chdir(cwd) != 0) {
                 perror(cwd);
                 return 1;
@@ -212,13 +105,11 @@ int main(int argc, char *argv[])
             break;
         case 'r':
             /* Set RT scheduling priority */
-            sp.sched_priority = atoi(optarg);
-            if (sched_setscheduler(getpid(), SCHED_RR, &sp) < 0) {
+            if (try_schedrt(optarg) < 0) {
                 perror("sched_setscheduler");
                 return 1;
             }
             break;
-#endif /* __linux__ */
         case 'h':
             usage(argv[0]);
             exit(0);
