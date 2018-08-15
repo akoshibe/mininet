@@ -24,13 +24,7 @@ from mininet.clean import cleanup
 import mininet.cli
 from mininet.log import lg, LEVELS, info, debug, warn, error, output
 from mininet.net import Mininet, MininetWithControlNet, VERSION
-from mininet.node import ( Host, CPULimitedHost, Controller, OVSController,
-                           Ryu, NOX, RemoteController, findController,
-                           DefaultController, NullController, Switchd,
-                           UserSwitch, OVSSwitch, OVSBridge,
-                           IVSSwitch, IfSwitch, DefaultSwitch )
-from mininet.nodelib import ClassicBridge
-from mininet.link import Link, TCLink, TCULink, OVSLink
+from mininet.node import findController
 from mininet.topo import ( SingleSwitchTopo, LinearTopo,
                            SingleSwitchReversedTopo, MinimalTopo )
 from mininet.topolib import TreeTopo, TorusTopo
@@ -46,6 +40,14 @@ from mininet.examples.cluster import ( MininetCluster, RemoteHost,
                                        ClusterCleanup )
 from mininet.examples.clustercli import ClusterCLI
 
+plat = os.uname()[ 0 ]
+if plat == 'FreeBSD':
+    from mininet.freebsd.mnopts import *
+elif plat == 'OpenBSD':
+    from mininet.openbsd.mnopts import *
+else:
+    from mininet.linux.mnopts import *
+
 PLACEMENT = { 'block': SwitchBinPlacer, 'random': RandomPlacer }
 
 # built in topologies, created only when run
@@ -58,36 +60,9 @@ TOPOS = { 'minimal': MinimalTopo,
           'torus': TorusTopo }
 
 SWITCHDEF = 'default'
-SWITCHES = { 'user': UserSwitch,
-             'ovs': OVSSwitch,
-             'ovsbr' : OVSBridge,
-             # Keep ovsk for compatibility with 2.0
-             'ovsk': OVSSwitch,
-             'ivs': IVSSwitch,
-             'ifsw': IfSwitch,
-             'sysbr': ClassicBridge,
-             'default': DefaultSwitch }
-
 HOSTDEF = 'proc'
-HOSTS = { 'proc': Host,
-          'rt': specialClass( CPULimitedHost, defaults=dict( sched='rt' ) ),
-          'cfs': specialClass( CPULimitedHost, defaults=dict( sched='cfs' ) ) }
-
 CONTROLLERDEF = 'default'
-CONTROLLERS = { 'ref': Controller,
-                'ovsc': OVSController,
-                'nox': NOX,
-                'remote': RemoteController,
-                'ryu': Ryu,
-                'swd': Switchd,
-                'default': DefaultController,  # Note: overridden below
-                'none': NullController }
-
 LINKDEF = 'default'
-LINKS = { 'default': Link,  # Note: overridden below
-          'tc': TCLink,
-          'tcu': TCULink,
-          'ovs': OVSLink }
 
 # TESTS dict can contain functions and/or Mininet() method names
 # XXX: it would be nice if we could specify a default test, but
@@ -280,7 +255,8 @@ class MininetRunner( object ):
                          " that uses Mininet's"
                          " IP subnet into the Mininet network."
                          " If you need to change"
-                         " Mininet's IP subnet, see the --ipbase option." )
+                         " Mininet's IP subnet, see the --ipbase option."
+                         " (Not available on all platforms)" )
         opts.add_option( '--version', action='callback', callback=version,
                          help='prints the version and exits' )
         opts.add_option( '--cluster', type='string', default=None,
