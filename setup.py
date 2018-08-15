@@ -14,6 +14,15 @@ scripts = [ join( 'bin', filename ) for filename in [ 'mn' ] ]
 
 modname = distname = 'mininet'
 
+def sys_package():
+    if sys.platform.startswith('freebsd'):
+        return ['mininet.freebsd']
+    elif sys.platform.startswith('linux'):
+        return ['mininet.linux']
+    elif sys.platform.startswith('openbsd'):
+        return ['mininet.openbsd']
+    return []
+
 setup(
     name=distname,
     version=VERSION,
@@ -23,10 +32,7 @@ setup(
     packages=[
         'mininet',
         'mininet.examples',
-        'mininet.linux',
-        'mininet.freebsd',
-        'mininet.openbsd'
-    ],
+    ] + sys_package(),
     py_modules=[
         'mininet.examples.cluster',
         'mininet.examples.clustercli'
