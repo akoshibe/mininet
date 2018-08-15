@@ -1,7 +1,7 @@
 """
 OS-specific utility functions for OpenBSD, counterpart to util.py.
 """
-
+from time import sleep
 from resource import getrlimit, setrlimit, RLIMIT_NPROC, RLIMIT_NOFILE
 
 from mininet.log import output, error, warn, info, debug
