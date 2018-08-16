@@ -8,6 +8,7 @@ from mininet.node import ( Host, CPULimitedHost, Controller, OVSController,
                            UserSwitch, OVSSwitch, OVSBridge, IVSSwitch,
                            DefaultSwitch )
 from mininet.nodelib import LinuxBridge
+from mininet.util import specialClass
 
 ClassicBridge = LinuxBridge
 DefaultControllers = ( Controller, OVSController )
@@ -18,7 +19,6 @@ CONTROLLERS = { 'ref': Controller,
                 'nox': NOX,
                 'remote': RemoteController,
                 'ryu': Ryu,
-                #'swd': Switchd,
                 'default': DefaultController,
                 'none': NullController }
 
@@ -28,7 +28,6 @@ SWITCHES = { 'user': UserSwitch,
              # Keep ovsk for compatibility with 2.0
              'ovsk': OVSSwitch,
              'ivs': IVSSwitch,
-             #'ifsw': IfSwitch,
              'sysbr': ClassicBridge,
              'default': DefaultSwitch }
 
