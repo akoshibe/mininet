@@ -11,30 +11,15 @@ ClassicBridge = Bridge4
 DefaultControllers = ( Switchd, )
 DefaultSwitch = IfSwitch
 
-CONTROLLERS = { #'ref': Controller,
-                #'ovsc': OVSController,
-                #'nox': NOX,
-                'remote': RemoteController,
-                #'ryu': Ryu,
+CONTROLLERS = { 'remote': RemoteController,
                 'swd': Switchd,
                 'default': DefaultController,
                 'none': NullController }
 
-SWITCHES = { #'user': UserSwitch,
-             #'ovs': OVSSwitch,
-             #'ovsbr' : OVSBridge,
-             # Keep ovsk for compatibility with 2.0
-             #'ovsk': OVSSwitch,
-             #'ivs': IVSSwitch,
-             'ifsw': IfSwitch,
+SWITCHES = { 'ifsw': IfSwitch,
              'sysbr': ClassicBridge,
              'default': DefaultSwitch }
 
-HOSTS = { #'rt': specialClass( CPULimitedHost, defaults=dict( sched='rt' ) ),
-          #'cfs': specialClass( CPULimitedHost, defaults=dict( sched='cfs' ) )
-          'proc': Host }
+HOSTS = { 'proc': Host }
 
-LINKS = { #'tc': TCLink,
-          #'tcu': TCULink,
-          #'ovs': OVSLink,
-	  'default': Link }
+LINKS = { 'default': Link }

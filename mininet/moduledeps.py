@@ -6,7 +6,7 @@ from os import environ, uname
 
 if uname()[ 0 ] == 'FreeBSD':
     from mininet.freebsd.util import ( lsmod, rmmod, modprobe )
-if uname()[ 0 ] == 'Linux':
+elif uname()[ 0 ] == 'Linux':
     from mininet.linux.util import ( lsmod, rmmod, modprobe )
 else:
     from mininet.openbsd.util import ( lsmod, rmmod, modprobe )

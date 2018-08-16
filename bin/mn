@@ -28,7 +28,7 @@ from mininet.node import findController
 from mininet.topo import ( SingleSwitchTopo, LinearTopo,
                            SingleSwitchReversedTopo, MinimalTopo )
 from mininet.topolib import TreeTopo, TorusTopo
-from mininet.util import customClass, specialClass, splitArgs
+from mininet.util import customClass, splitArgs
 from mininet.util import buildTopo
 
 from functools import partial
